@@ -175,7 +175,7 @@ export function planVoyage(input: PlanInput): Plan {
   if (!broken && input.stops.length) {
     const late = ret - deadline;
     if (late > 0.05) E('plan.late', { hours: late.toFixed(1), port: P[end].name }, end);
-    if (minFuel < 0 && minFuelAt) E('plan.fuelOut', { port: P[minFuelAt].name }, minFuelAt);
+    if (minFuel < 0 && minFuelAt) E('plan.fuelOut', { port: P[minFuelAt].name, short: Math.ceil(-minFuel), cap: ship.fuelCap }, minFuelAt);
     else if (minFuelAt && minFuel / ship.fuelCap < FUEL_RESERVE) W('plan.fuelLow', { pct: Math.round(minFuel / ship.fuelCap * 100), port: P[minFuelAt].name }, minFuelAt);
   }
   const seen = new Set<string>();

@@ -224,9 +224,7 @@ export function analyse(design: Design, tech: TechMods = NO_TECH): DesignReport 
 
   const fuelCap = hull.baseFuelT + tanks * hull.tankT;
   const hotelTph = demand * HOTEL_T_PER_KWH;
-  const service = hull.vmax * 0.8;
-  const burnPerDay = 24 * (service * hull.burnPerNm * tech.burn * 0.64 + hotelTph);
-  const fuelDays = fuelCap / burnPerDay;
+  const fuelDays = fuelRange({ fuelCap, vmax: hull.vmax, burnPerNm: hull.burnPerNm * tech.burn, hotelTph }, hull.vmax * SERVICE_SPEED).days;
   const foodDays = souls ? provisions / souls : 0;
   const endurance = Math.min(fuelDays, foodDays);
   const luxury = pax ? viewSum / pax : 0;
@@ -244,6 +242,20 @@ export function analyse(design: Design, tech: TechMods = NO_TECH): DesignReport 
     weight: W, kg, km: hull.km, gm, listDeg, fuelCap, fuelDays, provisions, foodDays, endurance,
     sat, spend, luxury, fitOut, specs,
   };
+}
+
+/** Cruising speed the endurance readout assumes, as a share of top speed. */
+export const SERVICE_SPEED = 0.8;
+
+/**
+ * How long the tank lasts at a given speed, using the planner's own fuel model: burn per mile
+ * rises with the square of speed, and hotel load burns by the hour (times any air conditioning).
+ */
+export function fuelRange(s: Pick<ShipSpecs, 'fuelCap' | 'vmax' | 'burnPerNm' | 'hotelTph'>, speed: number, hotelMult = 1): { days: number; nm: number } {
+  const v = Math.min(speed, s.vmax);
+  const perHour = v * s.burnPerNm * Math.pow(v / s.vmax, 2) + s.hotelTph * hotelMult;
+  const hours = perHour > 0 ? s.fuelCap / perHour : Infinity;
+  return { days: hours / 24, nm: hours * v };
 }
 
 /** A stable fingerprint of a layout, so a sea trial result is tied to the exact design it tested. */

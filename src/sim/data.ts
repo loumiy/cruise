@@ -80,6 +80,8 @@ export interface Region {
   stormNames?: string[];
   rivals: Rival[];
   land: Record<string, [number, number][]>;
+  /** Water cut out of the land polygons, drawn on top of them. */
+  water?: Record<string, [number, number][]>;
   labels: { lon: number; lat: number; text: string; kind: string; rot?: number }[];
   compass: { lon: number; lat: number }; scaleBar: { lon: number; lat: number };
   nodes: Record<string, [number, number]>;

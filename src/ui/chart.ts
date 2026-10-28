@@ -43,9 +43,14 @@ export function chartSvg(region: Region): string {
   }
   for (const k in region.land) s += '<polygon points="' + ptsAttr(region, region.land[k]) + '" fill="var(--shoal)" stroke="var(--shoal)" stroke-width="8" stroke-linejoin="round"/>';
   for (const k in region.land) s += '<polygon points="' + ptsAttr(region, region.land[k]) + '" fill="var(--land)" stroke="var(--land-edge)" stroke-width="1.2" stroke-linejoin="round"/>';
+  for (const k in region.water ?? {}) {
+    const pts = ptsAttr(region, region.water![k]);
+    s += '<polygon points="' + pts + '" fill="var(--shoal)" stroke="var(--land-edge)" stroke-width="1.2" stroke-linejoin="round"/>';
+    s += '<polygon points="' + pts + '" fill="var(--water)" stroke="var(--shoal)" stroke-width="6" stroke-linejoin="round"/>';
+  }
   const g = graphOf(region);
   for (const e of g.edges) if (!e.canal) s += '<polyline points="' + ptsAttr(region, e.pts) + '" fill="none" stroke="var(--lane)" stroke-width="1" stroke-dasharray="2 4"/>';
-  for (const e of g.edges) if (e.canal) s += '<polyline points="' + ptsAttr(region, e.pts) + '" fill="none" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="5 3"/>';
+  for (const e of g.edges) if (e.canal) s += '<polyline points="' + ptsAttr(region, e.pts) + '" fill="none" stroke="var(--ink-2)" stroke-width="2.5" stroke-dasharray="5 3"/>';
   for (const L of region.labels) {
     const [x, y] = proj(L.lon, L.lat);
     const cls = L.kind === 'land' ? 'land-lbl' : L.kind === 'water-sm' ? 'water-sm' : 'water-lbl';

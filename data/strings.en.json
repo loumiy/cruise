@@ -228,7 +228,7 @@
  "drydock.ro.berths": "Crew berths",
  "drydock.ro.endurance": "Endurance",
  "drydock.ro.days": "{n} days",
- "drydock.ro.enduranceSub": "Fuel {fuel} d ({t} t) · food {food} d",
+ "drydock.ro.enduranceSub": "Fuel {fuel} d at {kn} kn, {max} d at {top} kn{ac} · food {food} d",
  "drydock.ro.sat": "Satisfaction forecast",
  "drydock.ro.satSub": "Onboard spending ${spend} per guest per night",
  "drydock.ro.typical": "Typical 4-night cruise at ${fare}",
@@ -305,7 +305,7 @@
  "chart.ship": "Ship",
  "chart.chartered": "chartered",
  "chart.shipAt": "{port} · {date}",
- "chart.shipSpecs": "{pax} guests · {kn} kn · draft {draft} m · air {air} m · fuel {fuel} d · food {food} d",
+ "chart.shipSpecs": "{pax} guests · {kn} kn · draft {draft} m · air {air} m · range {fast}–{slow} nm · food {food} d",
  "chart.nights": "Nights",
  "chart.depart": "Departure day",
  "chart.waitNone": "Leave today",
@@ -398,7 +398,7 @@
  "plan.pvsaForeign": "US law needs a foreign stop on this round trip. Add a Canadian port.",
  "plan.food": "Food lasts {days} nights. Shorten the cruise or add stores.",
  "plan.late": "Arrives {hours} h late in {port}. Cut a stop or add a night.",
- "plan.fuelOut": "Fuel runs out before {port}. Add a refuel stop or a bigger tank.",
+ "plan.fuelOut": "Fuel runs out before {port}, {short} t short of the {cap} t tank. Add a refuel stop or a bigger tank.",
  "plan.fuelLow": "Fuel drops to {pct}% before {port}. Keep 15% in reserve.",
  "plan.repeat": "A second call at {port} adds no appeal. Try a new port.",
  "plan.seaDays": "{n} sea days on a {nights}-night cruise. Add a port.",
@@ -576,7 +576,7 @@
  "season.autumn": "Late fall",
  "hull.mega": "Mega",
  "drydock.hullLocked.mega": "Earn the Mega market milestone",
- "canal.panama": "Panama Canal (partial transit)",
+ "canal.panama": "Panama Canal",
  "country.BS": "Bahamas",
  "country.CU": "Cuba",
  "country.MX": "Mexico",
@@ -686,5 +686,6 @@
  "milestone.favorite.name": "Caribbean favorite",
  "milestone.favorite.goal": "Reach a 4.5-star reputation",
  "milestone.favorite.reward": "All demand +10%",
- "appeal.crowd": "Crowds at {port}"
+ "appeal.crowd": "Crowds at {port}",
+ "drydock.ro.withAc": " with air conditioning"
 }

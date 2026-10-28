@@ -6,7 +6,8 @@ import {
   firstDp, isSandbox, MAX_WAIT, graduationOpen, crossingFor, graduate, type VoyageResult,
 } from '../sim/game';
 import { stormsBetween, stormAt, coneNm, DANGER_NM } from '../sim/storms';
-import { portStatus, turnarounds, rivalsAt, NIGHT_OPTIONS, FUEL_RESERVE, type Plan, type PlanIssue } from '../sim/planner';
+import { fuelRange } from '../sim/ship';
+import { portStatus, turnarounds, rivalsAt, NIGHT_OPTIONS, FUEL_RESERVE, MIN_SPEED, type Plan, type PlanIssue } from '../sim/planner';
 import { fareCurve, summarise, FARE_MIN, FARE_MAX, FARE_STEP, type Finance } from '../sim/economy';
 import { fmtClock, fmtDate, seasonOf } from '../sim/calendar';
 import { projector } from '../sim/geo';
@@ -69,11 +70,13 @@ export function chartroom(app: App): Screen {
     let h = '<div data-tut="ships"><div class="label" style="margin-bottom:6px">' + esc(t('chart.ship')) + '</div><div class="ships" role="radiogroup">';
     for (const sh of s.ships) {
       const sp = specsOf(s, sh);
-      const fuelDays = sp.fuelCap / (24 * (sp.vmax * 0.8 * sp.burnPerNm * 0.64 + sp.hotelTph));
+      // The planner sails each leg as slowly as the schedule allows, so show both ends of the range.
+      const slow = fuelRange(sp, Math.min(sp.vmax, MIN_SPEED), region.hotelMult ?? 1), fast = fuelRange(sp, sp.vmax, region.hotelMult ?? 1);
       h += '<button type="button" class="ship" role="radio" aria-checked="' + (sh.id === plan.shipId) + '" data-ship="' + sh.id + '">' +
         '<span><span class="nm">' + esc(sh.name) + '</span> <span class="sub2">' + esc(t('hull.' + sp.hull)) + (sh.chartered ? ' · ' + esc(t('chart.chartered')) : '') + '</span></span>' +
         '<span class="loc">' + esc(t('chart.shipAt', { port: region.ports[sh.port].name, date: fmtDate(sh.day, false) })) + '</span>' +
-        '<span class="specs">' + esc(t('chart.shipSpecs', { pax: sp.pax, kn: sp.vmax, draft: sp.draft, air: sp.air, fuel: fuelDays.toFixed(1), food: Math.floor(sp.foodDays) })) + '</span></button>';
+        '<span class="specs">' + esc(t('chart.shipSpecs', { pax: sp.pax, kn: sp.vmax, draft: sp.draft, air: sp.air, food: Math.floor(sp.foodDays),
+          fast: Math.round(fast.nm / 10) * 10, slow: Math.round(slow.nm / 10) * 10, slowKn: Math.min(sp.vmax, MIN_SPEED) })) + '</span></button>';
     }
     h += '</div></div>';
 

@@ -5,7 +5,7 @@ import {
   bpById, report, runTrial, trialStatus, commission, canCommission, commissionCost, refitQuote, canRefit, refit,
   newBlueprint, copyBlueprint, deleteBlueprint, regionOf, isSandbox, type Blueprint,
 } from '../sim/game';
-import { canPlace, cellsOf, decksFor, fixedBlocks, hullOf, inShape, GM_MIN, STAIR_REACH, type Placed, type DesignReport } from '../sim/ship';
+import { canPlace, cellsOf, decksFor, fixedBlocks, hullOf, inShape, fuelRange, GM_MIN, STAIR_REACH, SERVICE_SPEED, type Placed, type DesignReport } from '../sim/ship';
 import { typicalCruise } from '../sim/economy';
 import { blockUnlocked } from '../sim/tech';
 import { encodeBlueprint, decodeBlueprint } from '../sim/share';
@@ -480,7 +480,11 @@ export function drydock(app: App): Screen {
     h += gauge(t('drydock.ro.power'), a.demand + ' / ' + a.supply + ' kW', pw, a.demand > a.supply ? 'err' : pw > 0.9 ? 'warn' : 'ok', t('drydock.ro.powerSub'));
     h += gauge(t('drydock.ro.boats'), a.lifeboatSeats + ' / ' + a.souls, a.souls ? a.lifeboatSeats / a.souls : 1, a.lifeboatSeats >= a.souls ? 'ok' : 'err', t('drydock.ro.boatsSub', { pax: a.pax, crew: a.crewNeed }));
     h += gauge(t('drydock.ro.berths'), a.beds + ' / ' + a.crewNeed, a.crewNeed ? a.beds / a.crewNeed : 1, a.beds >= a.crewNeed ? 'ok' : 'err');
-    h += gauge(t('drydock.ro.endurance'), t('drydock.ro.days', { n: a.endurance.toFixed(1) }), a.endurance / 10, a.endurance >= 4 ? 'ok' : a.endurance >= 3 ? 'warn' : 'err', t('drydock.ro.enduranceSub', { fuel: a.fuelDays.toFixed(1), food: a.foodDays.toFixed(1), t: a.fuelCap }), 0.4);
+    h += gauge(t('drydock.ro.endurance'), t('drydock.ro.days', { n: a.endurance.toFixed(1) }), a.endurance / 10, a.endurance >= 4 ? 'ok' : a.endurance >= 3 ? 'warn' : 'err', t('drydock.ro.enduranceSub', {
+      fuel: a.fuelDays.toFixed(1), kn: Math.round(a.specs.vmax * SERVICE_SPEED), food: a.foodDays.toFixed(1), t: a.fuelCap,
+      max: fuelRange(a.specs, a.specs.vmax, region.hotelMult ?? 1).days.toFixed(1), top: a.specs.vmax,
+      ac: (region.hotelMult ?? 1) > 1 ? t('drydock.ro.withAc') : '',
+    }), 0.4);
     h += gauge(t('drydock.ro.sat'), String(Math.round(a.sat)), a.sat / 100, a.sat >= 60 ? 'ok' : a.sat >= 40 ? 'warn' : 'err', t('drydock.ro.satSub', { spend: Math.round(a.spend) }));
     h += '<hr class="r"><div><div class="label" style="margin-bottom:4px">' + esc(t('drydock.ro.typical', { fare: tc.fare })) + '</div><div class="ledger">' +
       '<span>' + esc(t('drydock.ro.guests', { n: tc.fin.booked, pax: a.pax })) + '</span><span class="mono">' + money(tc.fin.rev + tc.fin.onboard) + '</span>' +

@@ -4,7 +4,9 @@ import { planVoyage, portStatus, rivalsAt, piersFree, type PlanInput } from '../
 import { stormsBetween, stormAt, realHit } from '../src/sim/storms';
 import { rollEvents, planSeed } from '../src/sim/events';
 import { checkCrossing } from '../src/sim/crossing';
-import { analyse } from '../src/sim/ship';
+import { analyse, fuelRange } from '../src/sim/ship';
+import { graphOf, edgeBlock } from '../src/sim/route';
+import { onLand } from '../src/sim/geo';
 import { dayOf, weekdayOf } from '../src/sim/calendar';
 import {
   newGame, report, runTrial, commission, graduate, crossingFor, graduationOpen, leaseIsland, canLeaseIsland,
@@ -227,5 +229,25 @@ describe('Chapter 2 progression', () => {
     expect(checkMilestones(s, { profit: 1, visited: [], day: day + 3 })).toContain('megaMarket');
     expect(s.unlocked.hulls).toContain('mega');
     expect(s.blueprints.some(b => b.design.hull === 'mega')).toBe(true);
+  });
+});
+
+describe('fuel range and the Panama Canal', () => {
+  it('the readout uses the planner’s fuel model: full speed and air conditioning cost range', () => {
+    const slow = fuelRange(liner, 16), fast = fuelRange(liner, liner.vmax), hot = fuelRange(liner, liner.vmax, 1.35);
+    expect(fast.days).toBeLessThan(slow.days * 0.7);
+    expect(hot.days).toBeLessThan(fast.days);
+  });
+  it('Colón and Cartagena sell fuel, so Miami > Colón > Cartagena > Barbados works for a Liner', () => {
+    const p = planVoyage(base({ stops: ['COL', 'CTG'], end: 'BGI', nights: 7 }));
+    expect(p.issues.filter(i => i.lvl === 'err').map(i => i.key)).toEqual([]);
+    expect(p.calls.every(c => c.refuel)).toBe(true);
+  });
+  it('the canal is drawn as a lane from Colón to the Pacific, and the Gulf of Panama is water', () => {
+    const e = graphOf(CA).edges.find(x => x.canal === 'panama')!;
+    expect([e.a, e.b]).toContain('COL');
+    expect(onLand(CA, CA.nodes.PAC)).toBe(false);
+    // The Bridge of the Americas leaves 61.3 m: the Mega (64 m air draft) can't pass.
+    expect(edgeBlock(e, { draft: 8.6, air: 64, beam: 41 })).toBe('air');
   });
 });

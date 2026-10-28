@@ -30,7 +30,9 @@ export function pointInPolygon(pt: LonLat, poly: LonLat[]): boolean {
   return c;
 }
 
+/** Land, minus any water cut out of it (a gulf drawn inside a big coastline polygon). */
 export function onLand(region: Region, pt: LonLat): boolean {
+  if (Object.values(region.water ?? {}).some(poly => pointInPolygon(pt, poly))) return false;
   return Object.values(region.land).some(poly => pointInPolygon(pt, poly));
 }
 

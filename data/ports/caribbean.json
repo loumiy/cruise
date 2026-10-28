@@ -508,7 +508,8 @@
    8,
    4,
    "start"
-  ]
+  ],
+  "fuel": true
  },
  "COL": {
   "name": "Colón",
@@ -531,9 +532,10 @@
   "berths": 3,
   "canalCall": 30000,
   "label": [
-   0,
-   16,
-   "middle"
-  ]
+   -9,
+   -4,
+   "end"
+  ],
+  "fuel": true
  }
 }
