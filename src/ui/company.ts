@@ -2,7 +2,7 @@
 import { t, tn } from '../sim/strings';
 import { FIRST_DP, MILESTONES, TECH, REGION_ORDER, REGIONS } from '../sim/data';
 import { dpAvailable, buyTech, specsOf, regionOf, refitQuote, isSandbox, bpById, canLeaseIsland, leaseIsland, moveRegion, ISLAND_LEASE,
-  companyDay, permitKey, canBidPermit, bidPermit, MAX_PERMITS, PERMIT_BID_RANGE } from '../sim/game';
+  companyDay, portName, permitKey, canBidPermit, bidPermit, MAX_PERMITS, PERMIT_BID_RANGE } from '../sim/game';
 import { dateOf } from '../sim/calendar';
 import { canBuy, tierOpen } from '../sim/tech';
 import { fmtDate } from '../sim/calendar';
@@ -33,7 +33,7 @@ export function company(app: App): Screen {
       const q = refitQuote(s, sh);
       const bp = sh.blueprintId ? bpById(s, sh.blueprintId) : undefined;
       h += '<tr><td><b>' + esc(sh.name) + '</b><br><span class="sub2">' + esc(t('hull.' + sp.hull)) + (sh.chartered ? ' · ' + esc(t('chart.chartered')) : '') + '</span></td>' +
-        '<td>' + esc(region.ports[sh.port].name) + '<br><span class="sub2">' + esc(t('company.freeFrom', { date: fmtDate(sh.day) })) + '</span></td>' +
+        '<td>' + esc(portName(s, sh)) + '<br><span class="sub2">' + esc(t('company.freeFrom', { date: fmtDate(sh.day) })) + '</span></td>' +
         '<td class="num">' + sp.pax + '</td><td class="num">' + sp.gm.toFixed(2) + '</td><td class="num">' + sh.voyages + '</td>' +
         '<td>' + (bp ? esc(bp.name) + (q ? '<br><span class="sub2 warned">' + ICON.warn + ' ' + esc(t('company.refitReady', { cost: kmoney(q.cost) })) + '</span>' : '') : '<span class="sub2">—</span>') + '</td>' +
         '<td><button type="button" class="btn sm" data-plan="' + sh.id + '">' + esc(t('company.planCruise')) + '</button>' +
@@ -138,7 +138,7 @@ export function company(app: App): Screen {
     root.querySelectorAll<HTMLButtonElement>('[data-region]').forEach(b => b.onclick = () => {
       if (moveRegion(s, b.dataset.region!).ok) { app.commit({ render: false }); app.go('company'); }
     });
-    root.querySelectorAll<HTMLButtonElement>('[data-plan]').forEach(b => b.onclick = () => { s.plan.shipId = b.dataset.plan!; app.commit({ render: false }); app.go('chartroom'); });
+    root.querySelectorAll<HTMLButtonElement>('[data-plan]').forEach(b => b.onclick = () => { if (s.mode === 'fleet') { app.go('fleet'); return; } s.plan.shipId = b.dataset.plan!; app.commit({ render: false }); app.go('chartroom'); });
     root.querySelectorAll<HTMLButtonElement>('[data-design]').forEach(b => b.onclick = () => { app.ui.bpId = b.dataset.design!; app.go('drydock'); });
     root.querySelectorAll<HTMLButtonElement>('[data-tech]').forEach(b => b.onclick = () => {
       const r = buyTech(s, b.dataset.tech!);

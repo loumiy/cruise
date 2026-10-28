@@ -12,6 +12,7 @@ import { nextOpenDay, seasonCloseDay, seasonOf, dateOf } from './calendar';
 import { hashString, mulberry } from './geo';
 import { checkCrossing, type CrossingCheck } from './crossing';
 import type { Vars } from './strings';
+import type { FleetState } from './fleet';
 
 export const SAVE_VERSION = 2;
 export const SANDBOX_CASH = 999_999_999;
@@ -36,6 +37,8 @@ export interface Blueprint {
 export interface ShipRec {
   id: string; name: string; blueprintId: string | null; design: Design;
   port: string; day: number; voyages: number; chartered?: boolean;
+  /** Fleet mode: the region the ship is in, the day it was built and its last drydock. */
+  region?: string; built?: number; docked?: number;
 }
 export interface LogEntry {
   n: number; day: number; region: string; season?: string; shipId: string; ship: string; route: string[]; nights: number;
@@ -54,13 +57,15 @@ export interface PlanDraft {
   lowSulfur?: boolean;
   /** Where carbon is charged: buy offsets for a carbon-neutral cruise. */
   offset?: boolean;
+  /** Fleet mode: plan from this port and day instead of where the ship is now, with this share of the region's guests. */
+  from?: string; day?: number; share?: number;
 }
 /** A season's Glacier Bay permit result: weekly slots won, and whether a bid already went in. */
 export interface PermitRecord { slots: number; bid: number; rival: number; outbid?: boolean }
 
 export interface GameState {
   version: number;
-  mode: 'campaign' | 'sandbox';
+  mode: 'campaign' | 'sandbox' | 'fleet';
   company: string;
   region: string;
   cash: number; rep: number;
@@ -75,6 +80,8 @@ export interface GameState {
   /** Glacier Bay permits by region and season year, e.g. "alaska:2029". */
   permits: Record<string, PermitRecord>;
   seq: number;
+  /** Fleet mode: the season clock, deployments and reports. */
+  fleet?: FleetState;
 }
 
 type StarterBlock = [string, number, number, number, number];
@@ -147,6 +154,8 @@ export const mods = (s: GameState): TechMods => techMods(s.tech);
 /** Sandbox owns every part without spending points, so it never counts below zero. */
 export const dpAvailable = (s: GameState) => isSandbox(s) ? 0 : Math.max(0, s.dpEarned - dpSpent(s.tech));
 export const shipById = (s: GameState, id: string) => s.ships.find(x => x.id === id);
+/** The name of the port a ship is in, wherever it is: in fleet mode ships sit in different regions. */
+export const portName = (s: GameState, ship: ShipRec) => REGIONS[ship.region ?? s.region]?.ports[ship.port]?.name ?? ship.port;
 export const bpById = (s: GameState, id: string) => s.blueprints.find(x => x.id === id);
 
 const reportCache = new Map<string, DesignReport>();
@@ -218,6 +227,7 @@ export function commission(s: GameState, bpId: string, port: string): { ship: Sh
     id: nextId(s, 's'), name: uniqueShipName(s, bp.name), blueprintId: bp.id, design: cloneDesign(bp.design),
     port, day: companyDay(s) + BUILD_DAYS, voyages: 0,
   };
+  ship.built = ship.day; ship.docked = ship.day; ship.region = s.region;
   s.ships.push(ship);
   const firsts: string[] = [];
   earnFirst(s, 'commission', firsts);
@@ -272,9 +282,9 @@ export function openGroups(s: GameState, day?: number): string[] {
 export function draftPlan(s: GameState, draft: PlanDraft = s.plan): Plan | null {
   const ship = shipById(s, draft.shipId);
   if (!ship) return null;
-  const departDay = ship.day + draft.wait;
+  const departDay = (draft.day ?? ship.day) + draft.wait;
   const plan = planVoyage({
-    region: regionOf(s), ship: specsOf(s, ship), start: ship.port, stops: draft.stops, end: draft.end,
+    region: regionOf(s), ship: specsOf(s, ship), start: draft.from ?? ship.port, stops: draft.stops, end: draft.end,
     nights: draft.nights, departDay, openGroups: openGroups(s, departDay), sandbox: isSandbox(s), tech: mods(s),
     lowSulfur: draft.lowSulfur ?? true, offset: !!draft.offset,
   });
@@ -339,7 +349,7 @@ export function bidPermit(s: GameState, day: number, amount: number): { won: boo
   return { won, rival, milestones: won ? checkMilestones(s) : [] };
 }
 
-export const market = (s: GameState): Market => ({ rep: s.rep, demandBonus: s.demandBonus });
+export const market = (s: GameState): Market => ({ rep: s.rep, demandBonus: s.demandBonus, share: s.plan.share });
 
 export function planFinance(s: GameState, plan: Plan, fare: number = s.plan.fare): Finance {
   return finance(regionOf(s), plan.input.ship, summarise(plan, s.plan.wait), fare, market(s));
@@ -351,7 +361,9 @@ export function normalisePlan(s: GameState): void {
   let ship = shipById(s, p.shipId);
   if (!ship) { ship = s.ships[0]; p.shipId = ship.id; }
   const region = regionOf(s);
-  if (!region.ports[p.end]?.turnaround) p.end = region.ports[ship.port]?.turnaround ? ship.port : turnarounds(region)[0];
+  // A fleet deployment repeats, so it always ends where it starts.
+  if (p.from) { if (!region.ports[p.from]?.turnaround) p.from = turnarounds(region)[0]; p.end = p.from; }
+  else if (!region.ports[p.end]?.turnaround) p.end = region.ports[ship.port]?.turnaround ? ship.port : turnarounds(region)[0];
   p.wait = Math.max(0, Math.min(MAX_WAIT, p.wait));
   // Each region offers its own cruise lengths: snap to the closest one on offer.
   const opts = nightOptions(region);
@@ -448,7 +460,7 @@ export function firstDp(id: string): number {
   return FIRST_DP[id.split(':')[0]] ?? 0;
 }
 
-function earnFirst(s: GameState, id: string, into: string[]): void {
+export function earnFirst(s: GameState, id: string, into: string[]): void {
   if (s.firsts.includes(id)) return;
   s.firsts.push(id);
   s.dpEarned += firstDp(id);
@@ -542,7 +554,7 @@ export function graduationOpen(s: GameState): boolean {
 /** The final region's graduation is a cruise, not a crossing. It opens once the chapter goals are met. */
 export function grandTourOpen(s: GameState): boolean {
   const g = regionOf(s).graduation;
-  if (!g?.cruise || s.milestones.includes(g.id)) return false;
+  if (s.mode === 'fleet' || !g?.cruise || s.milestones.includes(g.id)) return false;
   return isSandbox(s) || !g.requires || s.milestones.includes(g.requires);
 }
 

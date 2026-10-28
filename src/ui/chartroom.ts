@@ -3,8 +3,9 @@ import { t, tn } from '../sim/strings';
 import { MILESTONES, REGIONS } from '../sim/data';
 import {
   draftPlan, planFinance, sail, shipById, specsOf, regionOf, normalisePlan, market, seasonOver, layUp, layUpCost,
-  firstDp, isSandbox, MAX_WAIT, graduationOpen, crossingFor, graduate, grandTourOpen, grandTourChecks, type VoyageResult,
+  firstDp, isSandbox, MAX_WAIT, graduationOpen, crossingFor, graduate, grandTourOpen, grandTourChecks, portName, type VoyageResult,
 } from '../sim/game';
+import { setDeployment, seasonName, seasonYear, fleetGoals, type Deployment } from '../sim/fleet';
 import { stormsBetween, stormAt, coneNm, DANGER_NM } from '../sim/storms';
 import { fuelRange } from '../sim/ship';
 import { portStatus, turnarounds, rivalsAt, nightOptions, FUEL_RESERVE, MIN_SPEED, type Plan, type PlanIssue } from '../sim/planner';
@@ -58,23 +59,45 @@ export function chartroom(app: App): Screen {
     renderLog();
   }
 
+  /** The fleet deployment being planned, if this Chartroom visit is for one. */
+  function fleetEdit() {
+    const s = app.state;
+    return s.mode === 'fleet' && s.fleet?.edit && s.fleet.edit.shipId === s.plan.shipId ? s.fleet.edit : null;
+  }
+
+  function saveDeployment() {
+    const s = app.state, edit = fleetEdit(), p = s.plan;
+    if (!edit || !P || P.errors || !p.from) return;
+    const dep: Deployment = { region: region.id, from: p.from, stops: [...p.stops], nights: p.nights, fare: p.fare, wait: p.wait, lowSulfur: p.lowSulfur, offset: p.offset };
+    setDeployment(s, edit.shipId, edit.season, dep);
+    delete s.fleet!.edit;
+    sound.good(app.settings);
+    app.toast(t('fleet.edit.saved', { ship: shipById(s, edit.shipId)!.name }), 'ok');
+    app.commit({ render: false });
+    app.go('fleet');
+  }
+
   // ---------- planner ----------
   function renderPlanner() {
     const s = app.state, plan = s.plan, ship = shipById(s, plan.shipId)!, specs = specsOf(s, ship);
     const box = $('#planner', root)!;
     if (!P || !F) { box.innerHTML = ''; return; }
-    const over = seasonOver(s, ship);
+    // Fleet mode plans a deployment: one round trip that repeats all season, from a port the player picks.
+    const edit = fleetEdit();
+    const home = plan.from ?? ship.port, base = plan.day ?? ship.day;
+    const over = !edit && seasonOver(s, ship);
     const errs = P.issues.filter(i => i.lvl === 'err').length, warns = P.issues.filter(i => i.lvl === 'warn').length;
     const homes = turnarounds(region);
 
-    let h = '<div data-tut="ships"><div class="label" style="margin-bottom:6px">' + esc(t('chart.ship')) + '</div><div class="ships" role="radiogroup">';
-    for (const sh of s.ships) {
+    let h = edit ? '<div class="tour"><div class="label">' + esc(t('fleet.edit.head')) + '</div><div>' + esc(t('fleet.edit.what', { ship: ship.name, season: t('fleet.season.' + seasonName(edit.season)), year: seasonYear(edit.season), region: t('region.' + region.id) })) + '</div><div class="sub2">' + esc(t('fleet.edit.hint')) + '</div></div>' : '';
+    h += '<div data-tut="ships"><div class="label" style="margin-bottom:6px">' + esc(t('chart.ship')) + '</div><div class="ships" role="radiogroup">';
+    for (const sh of edit ? [ship] : s.ships) {
       const sp = specsOf(s, sh);
       // The planner sails each leg as slowly as the schedule allows, so show both ends of the range.
       const slow = fuelRange(sp, Math.min(sp.vmax, MIN_SPEED), region.hotelMult ?? 1), fast = fuelRange(sp, sp.vmax, region.hotelMult ?? 1);
       h += '<button type="button" class="ship" role="radio" aria-checked="' + (sh.id === plan.shipId) + '" data-ship="' + sh.id + '">' +
         '<span><span class="nm">' + esc(sh.name) + '</span> <span class="sub2">' + esc(t('hull.' + sp.hull)) + (sh.chartered ? ' · ' + esc(t('chart.chartered')) : '') + '</span></span>' +
-        '<span class="loc">' + esc(t('chart.shipAt', { port: region.ports[sh.port].name, date: fmtDate(sh.day, false) })) + '</span>' +
+        '<span class="loc">' + esc(edit ? t('fleet.edit.now', { port: portName(s, sh) }) : t('chart.shipAt', { port: portName(s, sh), date: fmtDate(sh.day, false) })) + '</span>' +
         '<span class="specs">' + esc(t('chart.shipSpecs', { pax: sp.pax, kn: sp.vmax, draft: sp.draft, air: sp.air, food: Math.floor(sp.foodDays),
           fast: Math.round(fast.nm / 10) * 10, slow: Math.round(slow.nm / 10) * 10, slowKn: Math.min(sp.vmax, MIN_SPEED) })) + '</span></button>';
     }
@@ -83,10 +106,10 @@ export function chartroom(app: App): Screen {
     h += '<div class="row2"><div><div class="label" style="margin-bottom:4px">' + esc(t('chart.nights')) + '</div><div class="seg" id="nights">' +
       nightOptions(region).map(n => '<button type="button" data-nights="' + n + '" aria-pressed="' + (plan.nights === n) + '">' + n + '</button>').join('') + '</div></div>' +
       '<div class="grow" data-tut="depart"><div class="label" style="margin-bottom:4px">' + esc(t('chart.depart')) + '</div><div class="seg days" id="wait">' +
-      Array.from({ length: MAX_WAIT + 1 }, (_, w) => '<button type="button" data-wait="' + w + '" aria-pressed="' + (plan.wait === w) + '" title="' + esc(w ? tn('chart.waitDays', w) : t('chart.waitNone')) + '">' + esc(fmtDate(ship.day + w, false).replace(/ \w+$/, '')) + '</button>').join('') +
+      Array.from({ length: MAX_WAIT + 1 }, (_, w) => '<button type="button" data-wait="' + w + '" aria-pressed="' + (plan.wait === w) + '" title="' + esc(w ? tn('chart.waitDays', w) : t('chart.waitNone')) + '">' + esc(fmtDate(base + w, false).replace(/ \w+$/, '')) + '</button>').join('') +
       '</div></div></div>';
-    const season = seasonOf(region, ship.day + plan.wait);
-    h += '<div class="sub2">' + esc(t('chart.departsOn', { date: fmtDate(ship.day + plan.wait), season: season ? t('season.' + season.id) : t('season.closed') })) +
+    const season = seasonOf(region, base + plan.wait);
+    h += '<div class="sub2">' + esc(t(edit ? 'fleet.edit.departs' : 'chart.departsOn', { date: fmtDate(base + plan.wait), season: season ? t('season.' + season.id) : t('season.closed') })) +
       (plan.wait ? ' · ' + esc(tn('chart.idle', plan.wait, { cost: kmoney(specs.lease * plan.wait) })) : '') + '</div>';
 
     // Emissions control area: choose low-sulfur fuel or risk a fine, unless the ship is fitted to burn clean.
@@ -121,7 +144,9 @@ export function chartroom(app: App): Screen {
     };
     h += '<div><div class="label" style="margin-bottom:6px;display:flex;justify-content:space-between"><span>' + esc(t('chart.itinerary')) + '</span>' +
       '<button type="button" class="btn sm" data-clear>' + esc(t('chart.clearStops')) + '</button></div><div class="itin">';
-    h += '<div class="stop"><span class="n home" aria-hidden="true">⚓</span><span><span class="nm">' + esc(region.ports[ship.port].name) + '</span><br><span class="tm">' + esc(t('chart.embark')) + '</span></span><span class="sub2">' + esc(t('chart.shipHere')) + '</span></div>';
+    if (edit) h += '<div class="stop"><span class="n home" aria-hidden="true">⚓</span><span><label class="nm">' + esc(t('fleet.edit.from')) + ' <select class="sel" id="fromSel" aria-label="' + esc(t('fleet.edit.from')) + '">' +
+      homes.map(k => '<option value="' + k + '"' + (k === home ? ' selected' : '') + '>' + esc(region.ports[k].name) + '</option>').join('') + '</select></label><br><span class="tm">' + esc(t('chart.embark')) + '</span></span><span></span></div>';
+    else h += '<div class="stop"><span class="n home" aria-hidden="true">⚓</span><span><span class="nm">' + esc(region.ports[ship.port].name) + '</span><br><span class="tm">' + esc(t('chart.embark')) + '</span></span><span class="sub2">' + esc(t('chart.shipHere')) + '</span></div>';
     if (!plan.stops.length) h += '<div class="empty">' + esc(t('chart.noStops')) + '</div>';
     plan.stops.forEach((id, i) => {
       h += legLine(i);
@@ -135,8 +160,8 @@ export function chartroom(app: App): Screen {
     });
     h += legLine(plan.stops.length);
     const lastLeg = P.legs.length === plan.stops.length + 1 ? P.legs[P.legs.length - 1] : null;
-    h += '<div class="stop"><span class="n home" aria-hidden="true">⚓</span><span><label class="nm">' + esc(t('chart.disembark')) + ' <select class="sel" id="endSel" aria-label="' + esc(t('chart.turnaround')) + '">' +
-      homes.map(k => '<option value="' + k + '"' + (k === plan.end ? ' selected' : '') + '>' + esc(region.ports[k].name) + '</option>').join('') + '</select></label><br>' +
+    h += '<div class="stop"><span class="n home" aria-hidden="true">⚓</span><span>' + (edit ? '<span class="nm">' + esc(t('fleet.edit.back', { port: region.ports[home].name })) + '</span><br>' : '<label class="nm">' + esc(t('chart.disembark')) + ' <select class="sel" id="endSel" aria-label="' + esc(t('chart.turnaround')) + '">' +
+      homes.map(k => '<option value="' + k + '"' + (k === plan.end ? ' selected' : '') + '>' + esc(region.ports[k].name) + '</option>').join('') + '</select></label><br>') +
       '<span class="tm">' + esc(lastLeg ? t('chart.arriveDue', { arr: fmtClock(lastLeg.arr), due: fmtClock(P.deadline) }) : t('chart.due', { due: fmtClock(P.deadline) })) + '</span></span><span></span></div>';
     h += '</div></div>';
 
@@ -146,7 +171,7 @@ export function chartroom(app: App): Screen {
       '<div class="curve"><svg id="curve" viewBox="0 0 320 92" role="img" aria-label="' + esc(t('chart.curveAria')) + '"></svg></div>' +
       '<div class="mix"><svg id="mix" viewBox="0 0 320 14" role="img" aria-label="' + esc(t('chart.mixAria')) + '"></svg><div class="keys" id="mixKeys"></div></div></div>';
     h += '<div class="kpis" id="kpis"></div>';
-    if (grandTourOpen(s)) {
+    if (!edit && grandTourOpen(s)) {
       const checks = grandTourChecks(s, P);
       h += '<div class="tour" data-tut="tour"><div class="label" style="margin-bottom:4px">' + esc(t('tour.head')) + '</div>' +
         checks.map(c => '<div class="' + (c.ok ? 'good' : 'sub2') + '">' + (c.ok ? ICON.ok : '○') + ' ' + esc(t(c.key, c.vars)) + '</div>').join('') +
@@ -154,7 +179,10 @@ export function chartroom(app: App): Screen {
     }
     h += '<div><div class="label" style="margin-bottom:6px">' + esc(t('chart.inspection', { e: errs, w: warns })) + '</div><div class="issues" id="issues"></div></div>';
     h += '<div class="ledger" id="ledger"></div>';
-    if (over) {
+    if (edit) {
+      h += '<button type="button" class="btn primary big" id="btnSave"' + (P.errors ? ' disabled' : '') + '>' + esc(P.errors ? tn('chart.fixToSail', P.errors) : t('fleet.edit.save')) + '</button>' +
+        '<button type="button" class="btn" data-back>' + esc(t('fleet.edit.cancel')) + '</button>';
+    } else if (over) {
       h += '<div class="issue warn"><span class="ic">' + ICON.warn + '</span><span>' + esc(t('chart.layup.why')) + '</span></div>' +
         '<button type="button" class="btn primary big" data-layup>' + esc(t('chart.layup.btn', { cost: kmoney(layUpCost(s, ship)) })) + '</button>';
     } else {
@@ -183,7 +211,12 @@ export function chartroom(app: App): Screen {
     box.querySelectorAll<HTMLButtonElement>('[data-dn]').forEach(b => b.onclick = () => change(() => { const i = Number(b.dataset.dn); [plan.stops[i + 1], plan.stops[i]] = [plan.stops[i], plan.stops[i + 1]]; }));
     box.querySelectorAll<HTMLButtonElement>('[data-rm]').forEach(b => b.onclick = () => change(() => { plan.stops.splice(Number(b.dataset.rm), 1); }));
     box.querySelector<HTMLButtonElement>('[data-clear]')!.onclick = () => change(() => { plan.stops = []; });
-    box.querySelector<HTMLSelectElement>('#endSel')!.onchange = e => change(() => { plan.end = (e.target as HTMLSelectElement).value; });
+    const endSel = box.querySelector<HTMLSelectElement>('#endSel');
+    if (endSel) endSel.onchange = () => change(() => { plan.end = endSel.value; });
+    const fromSel = box.querySelector<HTMLSelectElement>('#fromSel');
+    if (fromSel) fromSel.onchange = () => change(() => { plan.from = plan.end = fromSel.value; plan.stops = plan.stops.filter(x => x !== plan.from); });
+    box.querySelector<HTMLButtonElement>('#btnSave')?.addEventListener('click', saveDeployment);
+    box.querySelector<HTMLButtonElement>('[data-back]')?.addEventListener('click', () => { delete s.fleet!.edit; app.commit({ render: false }); app.go('fleet'); });
     const fare = box.querySelector<HTMLInputElement>('#fare')!;
     fare.oninput = () => {
       plan.fare = Number(fare.value);
@@ -298,7 +331,8 @@ export function chartroom(app: App): Screen {
       const p = region.ports[id], [x, y] = proj(p.lon, p.lat);
       const st = portStatus(region, id, specs, s.unlocked.portGroups, isSandbox(s));
       const idx = s.plan.stops.map((v, i) => v === id ? i + 1 : 0).filter(Boolean);
-      const isHome = id === ship.port || id === s.plan.end;
+      const home = s.plan.from ?? ship.port;
+      const isHome = id === home || id === s.plan.end;
       const n = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       n.setAttribute('class', 'port' + (st.ok ? '' : ' blocked') + (!st.ok && st.locked ? ' locked' : ''));
       n.setAttribute('tabindex', '0');
@@ -324,7 +358,7 @@ export function chartroom(app: App): Screen {
       const act = () => {
         if (sailing) return;
         if (!st.ok) { sound.red(app.settings); showTip(id); return; }
-        if (id === ship.port && !s.plan.stops.length) { showTip(id); return; }
+        if (id === (s.plan.from ?? ship.port) && !s.plan.stops.length) { showTip(id); return; }
         s.plan.stops.push(id);
         sound.click(app.settings);
         render();
@@ -336,7 +370,8 @@ export function chartroom(app: App): Screen {
       g.appendChild(n);
     }
     if (!sailing) {
-      const [x, y] = proj(region.ports[ship.port].lon, region.ports[ship.port].lat);
+      const at = region.ports[s.plan.from ?? ship.port];
+      const [x, y] = proj(at.lon, at.lat);
       $('#shipLayer', root)!.innerHTML = shipGlyph(x + 12, y - 12, 0);
     }
   }
@@ -345,7 +380,7 @@ export function chartroom(app: App): Screen {
     const s = app.state, ship = shipById(s, s.plan.shipId)!, specs = specsOf(s, ship);
     const p = region.ports[id], st = portStatus(region, id, specs, s.unlocked.portGroups, isSandbox(s));
     const card = $('#mapcard', root)!;
-    let status = st.ok ? (id === ship.port && !s.plan.stops.length ? t('chart.tip.here') : t('chart.tip.add', { n: s.plan.stops.length + 1 })) : t(st.key, st.vars);
+    let status = st.ok ? (id === (s.plan.from ?? ship.port) && !s.plan.stops.length ? t('chart.tip.here') : t('chart.tip.add', { n: s.plan.stops.length + 1 })) : t(st.key, st.vars);
     if (st.ok && s.plan.stops.includes(id)) status = t('chart.tip.again');
     tip.innerHTML = '<h4>' + esc(p.name) + '</h4><div class="sub2">' + esc(t('country.' + p.country)) + (p.turnaround ? ' · ' + esc(t('chart.tip.turnaround')) : '') + '</div>' +
       '<div class="tags">' + p.tags.map(x => '<span class="tag">' + esc(x) + '</span>').join('') + '</div>' +
@@ -385,7 +420,7 @@ export function chartroom(app: App): Screen {
   function renderStorms() {
     const g = $('#stormLayer', root)!;
     const s = app.state, ship = shipById(s, s.plan.shipId)!;
-    const d0 = ship.day + s.plan.wait, d1 = d0 + s.plan.nights;
+    const d0 = (s.plan.day ?? ship.day) + s.plan.wait, d1 = d0 + s.plan.nights;
     const ppn = pxPerNm(region);
     let h = '';
     for (const st of stormsBetween(region, d0, d1)) {
@@ -486,6 +521,10 @@ export function chartroom(app: App): Screen {
 
   function renderMilestones() {
     const s = app.state;
+    if (s.fleet) {
+      $('#milestones', root)!.innerHTML = fleetGoals(s).map(g => '<div class="m' + (g.done ? ' done' : '') + '"><span class="box">' + (g.done ? '✓' : '') + '</span><span><b>' + esc(t('fleet.goal.' + g.id)) + '</b><br><span class="ds">' + esc(t('fleet.goal.' + g.id + '.now', g.vars)) + '</span></span><span></span></div>').join('');
+      return;
+    }
     $('#milestones', root)!.innerHTML = (MILESTONES[s.region] ?? []).map(m => {
       const done = s.milestones.includes(m.id);
       return '<div class="m' + (done ? ' done' : '') + '"><span class="box" aria-label="' + esc(done ? t('ui.done') : t('ui.open')) + '">' + (done ? '✓' : '') + '</span>' +

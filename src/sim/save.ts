@@ -32,7 +32,7 @@ export function deserialise(text: string): GameState | null {
     if (m) s = m(s);
   }
   // Fill any field a newer build added, from a fresh game.
-  const base = newGame((s.mode as GameState['mode']) ?? 'campaign') as unknown as Record<string, unknown>;
+  const base = newGame(s.mode === 'sandbox' ? 'sandbox' : 'campaign') as unknown as Record<string, unknown>;
   const merged = { ...base, ...s, version: SAVE_VERSION } as unknown as GameState;
   if (!Array.isArray(merged.ships) || !merged.ships.length) return null;
   return merged;

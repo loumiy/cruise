@@ -27,7 +27,11 @@ export interface PlanSummary {
   offset?: boolean;
 }
 
-export interface Market { rep: number; demandBonus: number }
+export interface Market {
+  rep: number; demandBonus: number;
+  /** Fleet mode: this season's fuel price swing, and the share of the region's guests this ship can reach. */
+  fuelMult?: number; share?: number;
+}
 
 export interface Finance {
   mass: number; premium: number; booked: number; bookedMass: number; bookedPremium: number; occ: number;
@@ -70,7 +74,7 @@ export function demand(region: Region, ship: Pick<ShipSpecs, 'luxury' | 'pax'>, 
   const m = region.market;
   const appealF = Math.pow(Math.max(p.score, 1) / 60, 1.4);
   const repF = Math.max(0.6, 1 + 0.1 * (mk.rep - 3)) * (1 + mk.demandBonus);
-  const k = appealF * repF * p.seasonDemand * (NIGHTS_DEMAND[p.nights] ?? 0.8) * (p.flyIn ?? 1);
+  const k = appealF * repF * p.seasonDemand * (NIGHTS_DEMAND[p.nights] ?? 0.8) * (p.flyIn ?? 1) * (mk.share ?? 1);
   const lux = Math.min(1.6, ship.luxury);
   const eff = fare / (1 + 0.35 * lux);
   const mass = m.mass * k * Math.min(MASS_UNDERCUT_CAP, Math.exp(-(eff - m.rivalFare) / m.massSens));
@@ -91,7 +95,7 @@ export function finance(region: Region, ship: ShipSpecs, p: PlanSummary, fare: n
   const crew = ship.crew * CREW_WAGE * n;
   const lease = ship.lease * (n + p.idleDays);
   const food = booked * n * FOOD_PER_GUEST;
-  const fuel = Math.round(p.burned * (p.fuelPrice ?? region.fuelPrice));
+  const fuel = Math.round(p.burned * (p.fuelPrice ?? region.fuelPrice) * (mk.fuelMult ?? 1));
   const carbon = Math.round(p.burned * (p.carbonPrice ?? 0));
   const ports = p.calls.reduce((s, c) => s + c.callFee + c.headTax * booked + c.tenderFee, 0);
   const fees = p.tolls + p.pilotage;

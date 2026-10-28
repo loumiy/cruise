@@ -8,6 +8,8 @@ import { App } from './ui/app';
 import { chartroom } from './ui/chartroom';
 import { drydock } from './ui/drydock';
 import { company } from './ui/company';
+import { fleet } from './ui/fleet';
+import { newFleetGame } from './sim/fleet';
 import { applySettings, loadSettings } from './ui/settings';
 import { sound } from './ui/audio';
 import { esc, el, money } from './ui/dom';
@@ -20,7 +22,7 @@ let app: App | null = null;
 function start(state: GameState) {
   app?.destroy();
   writeSave(AUTOSAVE, state);
-  app = new App(root, state, settings, { chartroom, drydock, company }, titleScreen);
+  app = new App(root, state, settings, { chartroom, drydock, company, fleet }, titleScreen);
 }
 
 function titleScreen() {
@@ -39,7 +41,7 @@ function titleScreen() {
   if (auto) add(t('title.continue'), t('title.continueDesc', { company: auto.company, date: fmtDate(Math.min(...auto.ships.map(s => s.day))), cash: auto.mode === 'sandbox' ? '∞' : money(auto.cash) }), () => start(auto));
   add(t('title.campaign'), t('title.campaignDesc'), () => start(newGame('campaign')));
   add(t('title.sandbox'), t('title.sandboxDesc'), () => start(newGame('sandbox')));
-  add(t('title.fleet'), t('title.fleetDesc'), null);
+  add(t('title.fleet'), t('title.fleetDesc'), () => start(newFleetGame()));
   const slots = card.querySelector('#slots')!;
   SLOTS.forEach((k, i) => {
     const info = slotInfo(k);

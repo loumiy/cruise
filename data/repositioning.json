@@ -1,0 +1,11 @@
+{
+ "arrive": { "northeast": "NYC", "caribbean": "MIA", "alaska": "SEA", "europe": "SOU" },
+ "routes": [
+  { "a": "northeast", "b": "caribbean", "nm": 1100, "legNm": 1100 },
+  { "a": "northeast", "b": "europe", "nm": 3100, "legNm": 3100, "swell": 2.2 },
+  { "a": "caribbean", "b": "europe", "nm": 4300, "legNm": 2600, "swell": 2.0 },
+  { "a": "caribbean", "b": "alaska", "nm": 5600, "legNm": 1700, "limits": { "maxAir": 61.3, "maxBeam": 51.25, "maxLength": 366 } },
+  { "a": "northeast", "b": "alaska", "nm": 6700, "legNm": 1700, "limits": { "maxAir": 61.3, "maxBeam": 51.25, "maxLength": 366 } },
+  { "a": "alaska", "b": "europe", "nm": 9400, "legNm": 3100, "swell": 2.2, "limits": { "maxAir": 61.3, "maxBeam": 51.25, "maxLength": 366 } }
+ ]
+}

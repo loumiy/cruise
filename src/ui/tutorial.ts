@@ -119,7 +119,7 @@ export class Tutorial {
 
   private hint(): Hint | null {
     const st = this.app.state;
-    if (this.active || st.mode === 'sandbox') return null;
+    if (this.active || st.mode !== 'campaign') return null;
     return HINTS.find(h => !st.hints.includes(h.id) && (!h.screen || h.screen === this.app.screen) && h.when(this.app)) ?? null;
   }
 

@@ -2,12 +2,13 @@
 
 A ship-design and route-planning game. Build cruise ships deck by deck in the **Drydock**, plan cruises that fit what each ship can do in the **Chartroom**, and grow a small coastal line into a fleet.
 
-This build covers **Phases 1–5**: the full campaign of the design doc's production plan:
+This build covers **Phases 1–5** of the design doc's production plan, the full campaign, plus the first part of **Phase 6, fleet mode**:
 - the vertical slice: Drydock and Chartroom joined, save/load
 - Chapter 1, Northeast & Canada, ending with the graduation crossing to Miami
 - Chapter 2, the Caribbean, with the Mega hull, ending with the graduation through the Panama Canal
 - Chapter 3, Alaska & the Pacific Northwest, with the Expedition hull, ending with the transatlantic crossing
 - Chapter 4, Europe, with the Grand hull, ending with the Grand Tour
+- Fleet mode: seasons, deployments, repositioning and ship ageing on a new Fleet board
 
 ## Run it
 
@@ -56,6 +57,14 @@ Open the printed URL (default http://localhost:5173). Other scripts:
   - **Milestones:** first fjord, Kiel shortcut, Mediterranean summer, carbon-neutral cruise and European favorite.
   - **Tech:** hybrid battery (power, tier 3) and lightweight superstructure (hull, tier 3, 15% less fuel).
 - **Graduation: the Grand Tour.** One 14-night cruise touching three chart areas, with a zero-emission fjord call and a 4.5-star reputation. The planner shows a checklist. Sailing it ends the campaign and unlocks fleet mode, which comes in the next phase.
+- **Fleet mode.** Start it from the title screen (five ships, $40M) or carry a finished campaign into it from the closing card.
+  - **Seasons:** four a year (winter from 1 December). Each ship gets a deployment per season: one round trip from a home port, sailed back to back. *Run season* plays about 13 weeks at once and shows a report per ship.
+  - **Planning:** plans carry into later seasons until changed. Cards for a ship and season open the Chartroom to plan or edit a deployment, with the fare curve already counting your other ships in the region. A new game starts with year one pencilled in.
+  - **Repositioning:** a ship deployed to another region repositions first, with the same range, size and stability checks as the graduation crossings (Panama limits included), selling cheap seats on the way.
+  - **The puzzle:** departures that break a rule (a closed season, a hurricane-season storm, a late return) are cancelled, and idle ships cost half their lease (a quarter laid up). Your own ships in one region share its guests: each extra ship takes 15% off everyone's reach. Fuel prices swing by season (×0.85–1.25). Shore overhead is $600k per ship per season.
+  - **Ship life:** ships age. After 10 years interiors lose appeal, and upkeep rises with age. Drydock every 2½ years (3 weeks, 15% of the build fee). Overdue ships risk breakdowns that cancel cruises.
+  - **Goals:** twelve ships, a 4.8-star reputation, ships in all four regions in one season, a $500M company value, and a decade at sea.
+  - **Balance:** a sensible 10-year bot grows $40M to roughly $100–150M and never has a season that breaks the company. Reputation drifts toward what guests think (65 satisfaction holds 3 stars, 90 reaches 5) instead of pinning at 5.
 - **One-time prompts.** Each new mechanic gets one sentence the first time it matters (fuel stops, late returns, the crossing, air conditioning, full piers, crowds, storms, the island), then never again.
 - **Onboarding.** The guided first 15 minutes from the doc, one sentence and one action per step, skippable.
 - **Saves.** Autosave after every voyage and build change, three manual slots, export/import to a file, versioned with a migration hook.
@@ -103,7 +112,7 @@ The Liner's lease went from $45k to $60k a night so the Mega earns more per crui
 
 ## Not in this slice
 
-Fleet mode (Phase 6) is next. Known issue: money gets easy from Chapter 3 on. Cruise margins run about 50–60%, so cash outgrows what there is to spend it on. Costs need a pass alongside fleet mode, where ship ageing and running a fleet give cash somewhere to go. Rivals keep fixed schedules, as in the prototype; reacting rival AI belongs to fleet mode. Some simplifications to revisit:
+Still to come in fleet mode: rival lines with their own fleets that react to yours, loans, terminal leases, budget and premium brands, scenarios, and replaying a single cruise from a season on the map. Known issue: in the campaign, money gets easy from Chapter 3 on (cruise margins run about 50–60%). Fleet mode's overheads, idle costs, ageing and regional crowding hold it in check there. Some simplifications to revisit:
 
 - Tech parts apply to every ship at once instead of being fitted per ship.
 - The season is set by the calendar. The departure-day picker chooses a day in the next week.

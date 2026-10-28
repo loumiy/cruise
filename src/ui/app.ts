@@ -8,8 +8,9 @@ import { $, esc, money, stars, el } from './dom';
 import { applySettings, saveSettings, reducedMotion, type Settings } from './settings';
 import { sound } from './audio';
 import { Tutorial } from './tutorial';
+import { fleetGoals, toFleet } from '../sim/fleet';
 
-export type ScreenId = 'chartroom' | 'drydock' | 'company';
+export type ScreenId = 'chartroom' | 'drydock' | 'company' | 'fleet';
 
 export interface Screen { el: HTMLElement; render(): void; destroy?(): void }
 export type ScreenFactory = (app: App) => Screen;
@@ -44,7 +45,7 @@ export class App {
     root.appendChild(el('<main id="screen"></main>'));
     root.appendChild(el('<div class="toasts" id="toasts" aria-live="polite"></div>'));
     document.addEventListener('keydown', this.onKey);
-    this.go(state.unlocked.drydock && state.tutorial.off ? 'chartroom' : 'chartroom');
+    this.go(state.mode === 'fleet' ? 'fleet' : 'chartroom');
   }
 
   destroy() {
@@ -64,10 +65,13 @@ export class App {
   }
 
   canOpen(s: ScreenId): boolean {
+    if (s === 'fleet') return this.state.mode === 'fleet';
     return s !== 'drydock' || this.state.unlocked.drydock;
   }
 
   go(s: ScreenId) {
+    // In fleet mode the Chartroom plans one ship's season, so it opens from the Fleet board.
+    if (s === 'chartroom' && this.state.mode === 'fleet' && !this.state.fleet?.edit) { if (this.screen !== 'fleet') this.go('fleet'); this.toast(t('fleet.pickCell')); return; }
     if (!this.canOpen(s)) { this.toast(t('ui.drydockLocked')); return; }
     this.current?.destroy?.();
     this.screen = s;
@@ -96,19 +100,21 @@ export class App {
 
   renderTop() {
     const s = this.state;
-    const goal = currentGoal(s);
+    const fleetGoal = s.fleet ? fleetGoals(s).find(g => !g.done) : undefined;
+    const goal = s.fleet ? null : currentGoal(s);
     const tab = (id: ScreenId, extra = '') => '<button type="button" data-go="' + id + '"' + (this.screen === id ? ' aria-current="page"' : '') +
       (this.canOpen(id) ? '' : ' disabled title="' + esc(t('ui.drydockLocked')) + '"') + ' data-tut="nav-' + id + '">' + esc(t('screen.' + id)) + extra + '</button>';
     const dp = dpAvailable(s);
     $('#titlebar', this.root)!.innerHTML = '<div class="row">' +
       '<span class="brand"><svg class="emblem" aria-hidden="true" viewBox="0 0 34 34"><circle cx="17" cy="17" r="15.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 19.5 Q17 26 26 19.5 M17 8 L17 23 M12.5 12 L21.5 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>' + esc(t('game.title')) + '</span>' +
-      '<nav class="tabs" aria-label="' + esc(t('ui.screens')) + '">' + tab('chartroom') + tab('drydock', this.canOpen('drydock') ? '' : ' 🔒') +
+      '<nav class="tabs" aria-label="' + esc(t('ui.screens')) + '">' + (s.mode === 'fleet' ? tab('fleet') : '') + tab('chartroom') + tab('drydock', this.canOpen('drydock') ? '' : ' 🔒') +
       tab('company', dp > 0 ? ' <span class="badge" style="background:var(--accent)" title="' + esc(t('company.dpBadge', { n: dp })) + '">' + dp + '</span>' : '') + '</nav>' +
       '<div class="stats">' +
       '<span class="stat"><span class="label">' + esc(t('ui.cash')) + '</span><b>' + (s.mode === 'sandbox' ? '∞' : money(s.cash)) + '</b></span>' +
       '<span class="stat"><span class="label">' + esc(t('ui.reputation')) + '</span><b>' + s.rep.toFixed(1) + '</b><span class="stars" aria-hidden="true">' + stars(s.rep) + '</span></span>' +
       '<span class="stat"><span class="label">' + esc(t('ui.date')) + '</span><b>' + esc(fmtDate(companyDay(s))) + '</b></span>' +
-      (goal ? '<span class="stat goal"><span class="label">' + esc(t('ui.goal')) + '</span><span><b>' + esc(t('milestone.' + goal + '.name')) + ':</b> ' + esc(t('milestone.' + goal + '.goal')) + '</span></span>'
+      (fleetGoal ? '<span class="stat goal"><span class="label">' + esc(t('ui.goal')) + '</span><span><b>' + esc(t('fleet.goal.' + fleetGoal.id)) + ':</b> ' + esc(t('fleet.goal.' + fleetGoal.id + '.now', fleetGoal.vars)) + '</span></span>' :
+      goal ? '<span class="stat goal"><span class="label">' + esc(t('ui.goal')) + '</span><span><b>' + esc(t('milestone.' + goal + '.name')) + ':</b> ' + esc(t('milestone.' + goal + '.goal')) + '</span></span>'
         : '<span class="stat goal"><span class="label">' + esc(t('ui.goal')) + '</span><span>' + esc(t('ui.chapterDone')) + '</span></span>') +
       '<button type="button" class="btn sm" data-menu>' + esc(t('ui.menu')) + '</button>' +
       '</div></div>';
@@ -172,7 +178,7 @@ export class App {
       (s.mode === 'sandbox' ? '' : '<span>' + esc(t('ui.cash')) + '</span><span class="mono">' + money(s.cash) + '</span>') +
       '<span>' + esc(t('ui.reputation')) + '</span><span class="mono">' + s.rep.toFixed(1) + '</span></div>' +
       '<div class="unlock"><b>' + esc(t('campaign.fleetMode')) + '</b> ' + esc(t('campaign.fleetModeSub')) + '</div>';
-    this.modal({ title: t('campaign.title'), body, buttons: [{ label: t('campaign.keepSailing'), primary: true }] });
+    this.modal({ title: t('campaign.title'), body, buttons: [{ label: t('campaign.keepSailing') }, { label: t('campaign.toFleet'), primary: true, action: () => { toFleet(this.state); this.commit({ render: false }); this.go('fleet'); this.toast(t('fleet.started'), 'ok'); } }] });
   }
 
   // ---------- menu: saves and settings ----------
@@ -252,7 +258,7 @@ export class App {
     this.toast(t('menu.loaded'), 'ok');
   }
 
-  newGame(mode: 'campaign' | 'sandbox') {
+  newGame(mode: 'campaign' | 'sandbox' = 'campaign') {
     this.replaceState(newGame(mode));
   }
 }

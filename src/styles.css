@@ -381,3 +381,21 @@ textarea.code { width: 100%; min-height: 5rem; font-family: ui-monospace, Menlo,
   :root[data-tint]:not([data-theme="light"]) { --water: #0f3b62; --shoal: #165485; --grat: #134a76; --land: #2a3b52; }
 }
 :root[data-tint][data-theme="dark"] { --water: #0f3b62; --shoal: #165485; --grat: #134a76; --land: #2a3b52; }
+
+/* ---------- fleet board ---------- */
+.fboard { display: grid; grid-template-columns: minmax(200px, 1.1fr) repeat(var(--cols), minmax(0, 1fr)); gap: 8px; align-items: stretch; }
+.fhead { font-family: var(--f-display); font-weight: 700; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); padding: 0 4px; }
+.fship { display: flex; flex-direction: column; gap: 2px; padding: .5rem .6rem; background: var(--rule-2); border-radius: var(--r-sm); }
+.fship b { font-family: var(--f-display); font-weight: 800; }
+.fcell { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left; border: 2px solid var(--rule); border-radius: var(--r-sm); background: var(--sheet); padding: .5rem .6rem; min-height: 5.2rem; }
+.fcell:hover { border-color: var(--ink); }
+.fcell.carried { border-style: dashed; background: transparent; }
+.fcell.idle .fdep { color: var(--ink-2); }
+.fcell.empty { border-color: var(--err); background: var(--err-bg); }
+.fdep { font-weight: 700; font-size: .86rem; line-height: 1.2; }
+.rchip { font-family: var(--f-display); font-weight: 800; font-size: .66rem; letter-spacing: .08em; text-transform: uppercase; border-radius: 999px; padding: 2px 8px; background: #0b2a5b; color: #ffffff; }
+.rchip.r-northeast { background: #2f6fa8; } .rchip.r-caribbean { background: #0f8aa8; } .rchip.r-alaska { background: #1f6b6b; } .rchip.r-europe { background: #0b2a5b; }
+.fcell .flag { font-size: .72rem; font-weight: 700; background: var(--warn-bg); color: var(--warn); border-radius: 999px; padding: 1px 8px; }
+.fcell .flag.dock { background: var(--info-bg); color: var(--ink); }
+@media (max-width: 900px) { .fboard { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .fhead { display: none; } .fship { grid-column: 1 / -1; } }
+.frun { min-width: 240px; padding: .85rem 1.4rem; font-size: 1.05rem; }
