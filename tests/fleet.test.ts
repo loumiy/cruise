@@ -3,11 +3,11 @@ import { REGIONS } from '../src/sim/data';
 import { dateOf } from '../src/sim/calendar';
 import { serialise, deserialise } from '../src/sim/save';
 import { bestFare, summarise } from '../src/sim/economy';
-import { newGame } from '../src/sim/game';
+import { newGame, regionOf } from '../src/sim/game';
 import {
   newFleetGame, toFleet, runSeason, assignmentFor, setDeployment, setLayup, toggleDock, clearSeason, repoCheck,
   seasonStart, seasonAt, seasonName, seasonYear, planningDay, deploymentPlan, crowdShare, regionLoad, breakdownOdds,
-  dockDue, agePenalty, ageYears, companyValue, fleetGoals, repTarget, type Deployment,
+  dockDue, agePenalty, ageYears, companyValue, fleetGoals, repTarget, lineSummary, rivalShare, type Deployment,
 } from '../src/sim/fleet';
 
 const named = (s: ReturnType<typeof newFleetGame>, name: string) => s.ships.find(x => x.name === name)!;
@@ -156,7 +156,7 @@ describe('a 10-year fleet game', () => {
   const route: Record<string, string[]> = {
     'MV Puffin': ['layup', 'layup', 'northeast', 'northeast'],
     'MS Northern Crown': ['caribbean', 'caribbean', 'northeast', 'northeast'],
-    'MS Harbor Majesty': ['caribbean', 'caribbean', 'europe', 'europe'],
+    'MS Harbor Majesty': ['caribbean', 'caribbean', 'europe', 'caribbean'],
     'MV Northern Tern': ['caribbean', 'caribbean', 'alaska', 'caribbean'],
     'MS Atlantic Sovereign': ['caribbean', 'europe', 'europe', 'europe'],
   };
@@ -172,7 +172,7 @@ describe('a 10-year fleet game', () => {
           const dep: Deployment = { region: want, from, stops, nights, fare: 200, wait: 0, lowSulfur: true };
           const p = deploymentPlan(s, sh, dep, planningDay(idx));
           if (!p || p.issues.some(x => x.lvl === 'err' && x.key !== 'plan.offSeason' && x.key !== 'plan.seasonEnds')) continue;
-          if (!p.errors) dep.fare = bestFare(REGIONS[want], p.input.ship, summarise(p), { rep: s.rep, demandBonus: s.demandBonus, share: crowdShare(3) }).fare;
+          if (!p.errors) dep.fare = bestFare(p.input.region, p.input.ship, summarise(p), { rep: s.rep, demandBonus: s.demandBonus, share: crowdShare(3) }).fare;
           setDeployment(s, sh.id, idx, dep);
           break;
         }
@@ -196,5 +196,61 @@ describe('a 10-year fleet game', () => {
     expect(s.rep).toBeGreaterThan(2);
     expect(fleetGoals(s).find(g => g.id === 'decade')!.done).toBe(true);
     expect(companyValue(s)).toBeGreaterThan(s.cash);
+  });
+});
+
+describe('rival lines', () => {
+  it('three lines sail every region that has rivals, starting from the regions’ own ships', () => {
+    const s = newFleetGame(), R = s.fleet!.rivals!;
+    expect(new Set(R.ships.map(x => x.line))).toEqual(new Set(['azure', 'tradewind', 'coral']));
+    const lines = lineSummary(s);
+    expect(lines.map(l => l.line)).toEqual(['azure', 'tradewind', 'coral']);
+    expect(lines.every(l => l.ships > 0)).toBe(true);
+  });
+  it('the chart shows the rivals’ current schedules and fares', () => {
+    const s = newFleetGame();
+    s.region = 'caribbean';
+    const before = regionOf(s);
+    expect(before.rivals.length).toBe(s.fleet!.rivals!.ships.filter(x => x.region === 'caribbean').length);
+    s.fleet!.rivals!.fare.caribbean = 0.8;
+    s.fleet!.rivalsRev! += 1;
+    expect(regionOf(s).market.rivalFare).toBe(Math.round(REGIONS.caribbean.market.rivalFare * 0.8));
+    expect(regionOf(s)).toBe(regionOf(s));
+  });
+  it('crowd a rival’s port day and it may move the call away', () => {
+    const s = newFleetGame(), idx = s.fleet!.season;
+    // Put every ship on the same Caribbean loop as a rival, on the same days.
+    const rival = s.fleet!.rivals!.ships.find(x => x.region === 'caribbean' && x.line === 'tradewind')!;
+    const port = Object.values(rival.calls)[0];
+    let moved = 0;
+    for (let k = 0; k < 8; k++) {
+      for (const sh of s.ships) setDeployment(s, sh.id, idx + k, { region: 'caribbean', from: 'MIA', stops: [port], nights: 3, fare: 120, wait: k % 7 });
+      const r = runSeason(s);
+      moved += (r.rivalNews ?? []).filter(n => n.key === 'fleet.rival.move').length;
+    }
+    expect(moved).toBeGreaterThan(0);
+  });
+  it('take a big share of a region and its biggest line cuts fares; ease off and they recover', () => {
+    const s = newFleetGame(), idx = s.fleet!.season;
+    let cut = false;
+    for (let k = 0; k < 12 && !cut; k++) {
+      for (const sh of s.ships) setDeployment(s, sh.id, idx + k, { region: 'caribbean', from: 'MIA', stops: ['NAS', 'CZM', 'GCM'], nights: 7, fare: 120, wait: 0 });
+      cut = (runSeason(s).rivalNews ?? []).some(n => n.key === 'fleet.rival.cut');
+    }
+    expect(cut).toBe(true);
+    expect(s.fleet!.rivals!.fare.caribbean).toBeLessThan(1);
+    for (const sh of s.ships) setLayup(s, sh.id, s.fleet!.season);
+    for (let k = 0; k < 12; k++) runSeason(s);
+    expect(s.fleet!.rivals!.fare.caribbean).toBe(1);
+  });
+  it('once a year the lines launch bigger ships, and big lines retire old ones', () => {
+    const s = newFleetGame();
+    const berths0 = lineSummary(s).reduce((a, l) => a + l.berths, 0);
+    let launches = 0;
+    for (let k = 0; k < 12; k++) launches += (runSeason(s).rivalNews ?? []).filter(n => n.key === 'fleet.rival.launch').length;
+    expect(launches).toBeGreaterThan(0);
+    expect(lineSummary(s).reduce((a, l) => a + l.berths, 0)).toBeGreaterThan(berths0);
+    expect(s.fleet!.rivals!.ships.filter(x => x.line === 'azure').length).toBeLessThanOrEqual(14);
+    expect(rivalShare(s, 'caribbean')).toBeLessThanOrEqual(1);
   });
 });

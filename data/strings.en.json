@@ -972,5 +972,22 @@
  "fleet.edit.save": "Save deployment",
  "fleet.edit.cancel": "Back to the Fleet board",
  "fleet.edit.saved": "Deployment saved for {ship}.",
- "screen.fleet": "Fleet board"
+ "screen.fleet": "Fleet board",
+ "fleet.rival.move": "{line} moved the {ship} call at {port} from {from} to {to} to dodge your ships.",
+ "fleet.rival.cut": "{line} cut its {region} fares by {pct}% to win guests back from you.",
+ "fleet.rival.recover": "{line} raised its {region} fares back to normal.",
+ "fleet.rival.launch": "{region}: {line} launched {ship}, a {guests}-guest ship.",
+ "fleet.rival.retire": "{line} retired {ship} to make room for newer ships.",
+ "fleet.rivals": "Rival lines",
+ "fleet.rivals.line": "{ships} ships · {berths} berths a week",
+ "fleet.rivals.fares": "Rival fares",
+ "fleet.rivals.fare.normal": "normal",
+ "fleet.rivals.fare.cut": "{pct}% below normal",
+ "fleet.rivals.reach": "Rivals let you reach {pct}% of guests",
+ "fleet.rivals.hint": "Take a big share of a region and its rivals answer with cheaper fares, moved calls and new ships.",
+ "fleet.rivals.news": "What the rivals did",
+ "fleet.rivals.quiet": "The rivals held their course this season.",
+ "fleet.line.azure": "Big ships, low fares",
+ "fleet.line.tradewind": "Plays the islands",
+ "fleet.line.coral": "Chases premium guests"
 }

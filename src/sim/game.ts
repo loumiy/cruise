@@ -149,7 +149,28 @@ export function nextId(s: GameState, prefix: string): string {
 }
 
 export const isSandbox = (s: GameState) => s.mode === 'sandbox';
-export const regionOf = (s: GameState): Region => REGIONS[s.region];
+/**
+ * The region as the player sees it. In fleet mode the rival lines move, cut fares and launch ships,
+ * so their current schedules and fares replace the region's fixed ones. Cached, so the Chartroom
+ * can tell when the chart needs redrawing.
+ */
+const fleetRegionCache = new Map<string, Region>();
+export function regionOf(s: GameState): Region {
+  const base = REGIONS[s.region], R = s.fleet?.rivals;
+  if (!R) return base;
+  const key = (s.fleet!.id ?? '') + ':' + s.region + ':' + (s.fleet!.rivalsRev ?? 0);
+  let r = fleetRegionCache.get(key);
+  if (!r) {
+    r = {
+      ...base,
+      rivals: R.ships.filter(x => x.region === s.region).map(x => ({ ship: x.ship, line: x.line, guests: x.guests, calls: x.calls })),
+      market: { ...base.market, rivalFare: Math.round(base.market.rivalFare * (R.fare[s.region] ?? 1)) },
+    };
+    if (fleetRegionCache.size > 40) fleetRegionCache.clear();
+    fleetRegionCache.set(key, r);
+  }
+  return r;
+}
 export const mods = (s: GameState): TechMods => techMods(s.tech);
 /** Sandbox owns every part without spending points, so it never counts below zero. */
 export const dpAvailable = (s: GameState) => isSandbox(s) ? 0 : Math.max(0, s.dpEarned - dpSpent(s.tech));

@@ -3,8 +3,9 @@
 // about 13 weeks at once. Moving a ship between regions is a repositioning cruise.
 import { HULLS, REGIONS, REGION_ORDER, type Graduation } from './data';
 import repoJson from '../../data/repositioning.json';
+import rivalsJson from '../../data/rivals.json';
 import {
-  newGame, draftPlan, specsOf, voyageSat, earnFirst, nextId, cloneDesign, report, runTrial, commission, mods,
+  newGame, draftPlan, specsOf, voyageSat, earnFirst, nextId, cloneDesign, report, runTrial, commission, mods, regionOf,
   type GameState, type ShipRec, type PlanDraft,
 } from './game';
 import { finance, summarise, bestFare, CREW_WAGE, FOOD_PER_GUEST } from './economy';
@@ -32,6 +33,19 @@ export interface ShipSeason {
 export interface SeasonReport {
   season: number; ships: ShipSeason[]; profit: number; overhead: number; repBefore: number; repAfter: number;
   fuel: number; cashAfter: number;
+  /** What the rival lines did in answer. */
+  rivalNews?: RivalNews[];
+}
+
+/** A rival line's ship in fleet mode: it sails one region on a weekly pattern of calls. */
+export interface RivalShip { ship: string; line: string; guests: number; region: string; calls: Record<string, string> }
+export interface RivalNews { key: string; vars: Vars; line: string }
+export interface RivalState {
+  ships: RivalShip[];
+  /** Each region's rival fare, as a share of where it started. */
+  fare: Record<string, number>;
+  /** Rival berths per week in each region at the start, to measure growth against. */
+  base: Record<string, number>;
 }
 
 export interface FleetState {
@@ -43,6 +57,10 @@ export interface FleetState {
   edit?: { shipId: string; season: number };
   /** The year the fleet started, for the 10-year goal. */
   startSeason: number;
+  /** The three rival lines, and a counter that ticks whenever they change. */
+  rivals?: RivalState; rivalsRev?: number;
+  /** Tells one fleet game from another, for caches and seeds. */
+  id?: string;
 }
 
 export const SEASON_NAMES = ['winter', 'spring', 'summer', 'fall'];
@@ -137,7 +155,7 @@ export const dockCost = (ship: ShipRec) => Math.round(HULLS[ship.design.hull].co
 /** Satisfaction lost to an old interior. */
 export const agePenalty = (age: number) => Math.min(15, Math.max(0, (age - OLD_AGE) * 1.5));
 /** Upkeep as a share of the lease: rises with age. */
-export const upkeepShare = (age: number) => Math.min(0.6, 0.02 * age + Math.max(0, age - OLD_AGE) * 0.03);
+export const upkeepShare = (age: number) => Math.min(0.5, 0.01 * age + Math.max(0, age - OLD_AGE) * 0.02);
 
 /** Odds a cruise is cancelled by a breakdown, once the ship is overdue for drydock. */
 export function breakdownOdds(ship: ShipRec, day: number): number {
@@ -240,11 +258,11 @@ export function runSeason(s: GameState): SeasonReport {
       const want = (planningDay(idx) + dep.wait) % 7;
       while (((day % 7) + 7) % 7 !== ((want % 7) + 7) % 7) day++;
       ship.port = dep.from;
-      const share = crowdShare(load[dep.region] ?? 1);
+      const share = crowdShare(load[dep.region] ?? 1) * rivalShare(s, dep.region);
+      const region = withRegion(s, dep.region, () => regionOf(s));
       while (day + dep.nights <= end) {
         const plan = deploymentPlan(s, ship, dep, day);
         if (!plan || plan.errors) { skipped++; idle += 7; day += 7; continue; }
-        const region = REGIONS[dep.region];
         const fin = finance(region, plan.input.ship, summarise(plan), dep.fare, { rep: s.rep, demandBonus: s.demandBonus, fuelMult, share });
         const events = rollEvents(plan, plan.input.ship, fin.booked, planSeed(plan, ship.id), mods(s));
         const age = ageYears(ship, day);
@@ -293,10 +311,151 @@ export function runSeason(s: GameState): SeasonReport {
   const overhead = OVERHEAD_PER_SHIP * s.ships.length;
   s.cash += total - overhead;
   const rep: SeasonReport = { season: idx, ships: rows, profit: total - overhead, overhead, repBefore, repAfter: s.rep, fuel: fuelMult, cashAfter: s.cash };
+  rep.rivalNews = rivalTurn(s, rep);
   F.reports.push(rep);
   if (F.reports.length > 12) F.reports.shift();
   F.season = idx + 1;
   return rep;
+}
+
+// ---------- rival lines ----------
+
+interface LineStyle { cut: number; move: number; launch: number; guests: [number, number]; prefer: string[]; names: string[] }
+const RIVALS = rivalsJson as unknown as {
+  lines: Record<string, { name: string; style: string }>;
+  fleet: { lines: string[]; remap: Record<string, string>; style: Record<string, LineStyle> };
+} & Record<string, { ship: string; line: string; guests: number; calls: Record<string, string> }[]>;
+export const RIVAL_LINE_IDS = RIVALS.fleet.lines;
+export const lineStyle = (id: string) => RIVALS.fleet.style[id];
+/** A line's ships never number more than this. */
+export const LINE_CAP = 14;
+/** A line this size retires a ship for each one it launches. */
+export const RETIRE_AT = 8;
+/** Rival fares never drop below this share of where they started. */
+export const FARE_FLOOR = 0.75;
+/** Your guests in a region against the rivals' season capacity: above this, the rivals feel it. */
+export const PRESSURE = 0.06;
+
+/** Three lines across all regions, from the regions' own rival ships. Smaller lines fold into the big three. */
+export function initRivals(): RivalState {
+  const ships: RivalShip[] = [], base: Record<string, number> = {}, fare: Record<string, number> = {};
+  for (const id of REGION_ORDER) {
+    fare[id] = 1;
+    for (const r of RIVALS[id] ?? []) {
+      ships.push({ ship: r.ship, line: RIVALS.fleet.remap[r.line] ?? r.line, guests: r.guests, region: id, calls: { ...r.calls } });
+      base[id] = (base[id] ?? 0) + r.guests;
+    }
+  }
+  return { ships, base, fare };
+}
+
+const rivalsOf = (s: GameState): RivalState => (s.fleet!.rivals ??= initRivals());
+const weekBerths = (R: RivalState, region: string) => R.ships.filter(x => x.region === region).reduce((a, x) => a + x.guests, 0);
+
+/** More rival berths in a region than at the start means fewer guests for you, and fewer means more. */
+export function rivalShare(s: GameState, region: string): number {
+  const R = s.fleet?.rivals;
+  if (!R || !R.base[region]) return 1;
+  return Math.min(1.15, Math.pow(R.base[region] / Math.max(1, weekBerths(R, region)), 0.35));
+}
+
+/** Port and weekday of every call your deployed ships make in a season. */
+function playerCalls(s: GameState, idx: number): Set<string> {
+  const out = new Set<string>();
+  for (const sh of s.ships) {
+    const a = assignmentFor(s, sh.id, idx);
+    if (!a.dep) continue;
+    const p = deploymentPlan(s, sh, a.dep, planningDay(idx) + a.dep.wait);
+    if (!p || p.broken) continue;
+    for (const c of p.calls) out.add(a.dep.region + '|' + c.id + '|' + c.weekday);
+  }
+  return out;
+}
+
+/**
+ * The rivals answer the season. Crowd one of their port days and they may move the call, cut their
+ * fares where you take a big share, or once a year launch a bigger ship where you are strongest.
+ */
+export function rivalTurn(s: GameState, rep: SeasonReport): RivalNews[] {
+  const F = s.fleet!, R = rivalsOf(s), idx = rep.season;
+  const rnd = mulberry(hashString('rivals:' + idx + ':' + F.startSeason));
+  const news: RivalNews[] = [];
+  const name = (line: string) => RIVALS.lines[line]?.name ?? line;
+  const mine = playerCalls(s, idx);
+  // Moves: a call that shares a port day with yours may shift to a free weekday.
+  for (const r of R.ships) {
+    const st = lineStyle(r.line);
+    for (const [wd, port] of Object.entries(r.calls)) {
+      if (!mine.has(r.region + '|' + port + '|' + wd) || rnd() >= st.move) continue;
+      const P = REGIONS[r.region].ports[port];
+      const free = [1, 2, 3, 4, 5, 6].map(k => (Number(wd) + k) % 7).find(d =>
+        !r.calls[String(d)] && !mine.has(r.region + '|' + port + '|' + d) &&
+        R.ships.filter(o => o.region === r.region && o.calls[String(d)] === port).length < (P?.berths ?? 99));
+      if (free == null) continue;
+      delete r.calls[wd];
+      r.calls[String(free)] = port;
+      news.push({ key: 'fleet.rival.move', line: r.line, vars: { line: name(r.line), ship: r.ship, port: P?.name ?? port, from: '@weekday.' + wd, to: '@weekday.' + free } });
+    }
+  }
+  // Fares: where you carry a big share of the region's guests, the region's biggest line cuts.
+  const guests: Record<string, number> = {};
+  for (const x of rep.ships) guests[x.region] = (guests[x.region] ?? 0) + x.guests;
+  for (const region of REGION_ORDER) {
+    const cap = weekBerths(R, region) * 13;
+    if (!cap) continue;
+    const lead = RIVAL_LINE_IDS.map(l => ({ l, g: R.ships.filter(x => x.region === region && x.line === l).reduce((a, x) => a + x.guests, 0) })).sort((a, b) => b.g - a.g)[0].l;
+    const pressure = (guests[region] ?? 0) / cap;
+    // The harder you press, the likelier a cut, and each cut makes the next one harder for them to afford.
+    const odds = Math.min(0.6, (pressure - PRESSURE) * 6) * ((R.fare[region] ?? 1) <= 0.85 ? 0.4 : 1);
+    if (pressure > PRESSURE && rnd() < odds) {
+      const before = R.fare[region] ?? 1;
+      R.fare[region] = Math.max(FARE_FLOOR, Math.round(before * lineStyle(lead).cut * 100) / 100);
+      if (R.fare[region] < before) news.push({ key: 'fleet.rival.cut', line: lead, vars: { line: name(lead), region: '@region.' + region, pct: Math.round((1 - R.fare[region] / before) * 100) } });
+    } else if ((R.fare[region] ?? 1) < 1) {
+      R.fare[region] = Math.min(1, Math.round(((R.fare[region] ?? 1) + 0.03) * 100) / 100);
+      if (R.fare[region] === 1) news.push({ key: 'fleet.rival.recover', line: lead, vars: { line: name(lead), region: '@region.' + region } });
+    }
+  }
+  // Launches: once a year, after the fall season, each line may add a bigger ship where you are strongest.
+  if (seasonQuarter(idx) === 3) {
+    const yearGuests: Record<string, number> = {};
+    for (const r of F.reports.slice(-4)) for (const x of r.ships) yearGuests[x.region] = (yearGuests[x.region] ?? 0) + x.guests;
+    for (const line of RIVAL_LINE_IDS) {
+      const st = lineStyle(line), fleet = R.ships.filter(x => x.line === line);
+      if (fleet.length >= LINE_CAP || rnd() >= st.launch) continue;
+      const choices = st.prefer.filter(r => R.ships.some(x => x.region === r));
+      if (!choices.length) continue;
+      const region = choices.slice().sort((a, b) => (yearGuests[b] ?? 0) - (yearGuests[a] ?? 0))[0];
+      const pattern = R.ships.filter(x => x.region === region);
+      const model = pattern[Math.floor(rnd() * pattern.length)];
+      const shift = 1 + Math.floor(rnd() * 6);
+      const calls: Record<string, string> = {};
+      for (const [wd, port] of Object.entries(model.calls)) calls[String((Number(wd) + shift) % 7)] = port;
+      const used = new Set(R.ships.map(x => x.ship));
+      const shipName = st.names.find(n => !used.has(n)) ?? name(line) + ' ' + (fleet.length + 1);
+      const g = Math.round((st.guests[0] + rnd() * (st.guests[1] - st.guests[0])) / 100) * 100;
+      R.ships.push({ ship: shipName, line, guests: g, region, calls });
+      news.push({ key: 'fleet.rival.launch', line, vars: { line: name(line), ship: shipName, guests: g.toLocaleString('en-US'), region: '@region.' + region } });
+      // A bigger line retires its smallest ship in the region to make room.
+      const old = fleet.filter(x => x.region === region).sort((a, b) => a.guests - b.guests)[0];
+      if (old && fleet.length >= RETIRE_AT && old.guests < g) {
+        R.ships.splice(R.ships.indexOf(old), 1);
+        news.push({ key: 'fleet.rival.retire', line, vars: { line: name(line), ship: old.ship } });
+      }
+    }
+  }
+  F.rivalsRev = (F.rivalsRev ?? 0) + 1;
+  return news;
+}
+
+/** Ships, berths and the fare stance of each line, for the Fleet board. */
+export function lineSummary(s: GameState) {
+  const R = rivalsOf(s);
+  return RIVAL_LINE_IDS.map(line => {
+    const ships = R.ships.filter(x => x.line === line);
+    const regions = [...new Set(ships.map(x => x.region))];
+    return { line, name: RIVALS.lines[line].name, style: RIVALS.lines[line].style, ships: ships.length, berths: ships.reduce((a, x) => a + x.guests, 0), regions };
+  });
 }
 
 // ---------- goals ----------
@@ -323,7 +482,8 @@ export function fleetGoals(s: GameState): FleetGoal[] {
 // ---------- starting a fleet game ----------
 
 export function initFleet(s: GameState, season: number): void {
-  s.fleet = { season, plans: {}, reports: [], startSeason: season };
+  s.fleet = { season, plans: {}, reports: [], startSeason: season, id: Math.random().toString(36).slice(2, 10), rivalsRev: 0 };
+  s.fleet.rivals = initRivals();
   for (const sh of s.ships) {
     sh.region ??= s.region;
     sh.built ??= 0;

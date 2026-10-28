@@ -271,5 +271,80 @@
     "6": "KEL"
    }
   }
- ]
+ ],
+ "fleet": {
+  "lines": [
+   "azure",
+   "tradewind",
+   "coral"
+  ],
+  "remap": {
+   "glacier": "azure",
+   "meridian": "coral"
+  },
+  "style": {
+   "azure": {
+    "cut": 0.9,
+    "move": 0.2,
+    "launch": 0.6,
+    "guests": [
+     5200,
+     6200
+    ],
+    "prefer": [
+     "caribbean",
+     "europe"
+    ],
+    "names": [
+     "Azure Colossus",
+     "Azure Titan",
+     "Azure Atlas",
+     "Azure Leviathan",
+     "Azure Monarch",
+     "Azure Paragon"
+    ]
+   },
+   "tradewind": {
+    "cut": 0.95,
+    "move": 0.55,
+    "launch": 0.45,
+    "guests": [
+     2800,
+     3600
+    ],
+    "prefer": [
+     "caribbean"
+    ],
+    "names": [
+     "Tradewind Breeze",
+     "Tradewind Zephyr",
+     "Tradewind Mistral",
+     "Tradewind Sirocco",
+     "Tradewind Monsoon",
+     "Tradewind Chinook"
+    ]
+   },
+   "coral": {
+    "cut": 0.97,
+    "move": 0.35,
+    "launch": 0.4,
+    "guests": [
+     2200,
+     2900
+    ],
+    "prefer": [
+     "europe",
+     "alaska"
+    ],
+    "names": [
+     "Coral Elegance",
+     "Coral Grace",
+     "Coral Serene",
+     "Coral Radiance",
+     "Coral Splendour",
+     "Coral Harmony"
+    ]
+   }
+  }
+ }
 }

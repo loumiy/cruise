@@ -148,6 +148,8 @@ textarea.code { width: 100%; min-height: 5rem; font-family: ui-monospace, Menlo,
 .ledger .mono { text-align: right; }
 .ledger .tot { border-top: 1.5px solid var(--ink); padding-top: 4px; font-weight: 700; }
 .ledger .hd { grid-column: 1 / -1; margin-top: .5rem; }
+.fnews { margin: 0; padding-left: 1.1rem; font-size: .88rem; }
+.fnews li { margin: 2px 0; }
 .gauge { display: flex; flex-direction: column; gap: 5px; }
 .gauge .top { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; }
 .gauge .val { font-family: var(--f-display); font-weight: 800; font-size: .98rem; font-variant-numeric: tabular-nums; }
@@ -304,6 +306,7 @@ textarea.code { width: 100%; min-height: 5rem; font-family: ui-monospace, Menlo,
 
 /* ---------- company ---------- */
 .co-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1.1rem; align-items: start; }
+.stack { display: flex; flex-direction: column; gap: 1.1rem; min-width: 0; }
 .co-head { display: flex; gap: 1rem 2.2rem; flex-wrap: wrap; align-items: baseline; background: var(--nav); color: var(--nav-ink); border-radius: var(--r); box-shadow: var(--shadow); padding: 1rem 1.2rem; }
 .co-head .label, .co-head .btn.link { color: var(--nav-2); }
 .co-head h1 { font-family: var(--f-display); font-weight: 800; font-size: clamp(1.4rem, 3vw, 2rem); margin: 0; line-height: 1.05; }

@@ -6,6 +6,7 @@ import { nightOptions, turnarounds } from '../sim/planner';
 import {
   assignmentFor, setLayup, toggleDock, clearSeason, runSeason, repoCheck, shipRegion, ageYears, dockDue, dockCost,
   seasonName, seasonYear, seasonStart, planningDay, fuelIndex, companyValue, fleetGoals, regionLoad, crowdShare, arrivalPort,
+  lineSummary, rivalShare,
   OVERHEAD_PER_SHIP, DOCK_DAYS, type SeasonReport, type Assignment,
 } from '../sim/fleet';
 import { fmtDate } from '../sim/calendar';
@@ -71,13 +72,13 @@ export function fleet(app: App): Screen {
 
     // Region load next season: own ships share a region's guests.
     const load = regionLoad(s, idx);
-    h += '<div class="co-grid"><div class="panel"><div class="label" style="margin-bottom:.5rem">' + esc(t('fleet.regions')) + '</div><div class="ledger">' +
+    h += '<div class="co-grid"><div class="stack"><div class="panel"><div class="label" style="margin-bottom:.5rem">' + esc(t('fleet.regions')) + '</div><div class="ledger">' +
       REGION_ORDER.map(r => '<span>' + esc(t('region.' + r)) + '</span><span class="mono">' + esc(load[r] ? t('fleet.regionLoad', { n: load[r], pct: Math.round(crowdShare(load[r]) * 100) }) : '—') + '</span>').join('') +
       '<span>' + esc(t('fleet.overhead')) + '</span><span class="mono">' + money(-OVERHEAD_PER_SHIP * s.ships.length) + '</span></div></div>';
     // Goals.
     h += '<div class="panel"><div class="label" style="margin-bottom:.5rem">' + esc(t('fleet.goals')) + '</div><div class="ms">' +
       fleetGoals(s).map(g => '<div class="m' + (g.done ? ' done' : '') + '"><span class="box">' + (g.done ? '✓' : '') + '</span><span><b>' + esc(t('fleet.goal.' + g.id)) + '</b><br><span class="ds">' + esc(t('fleet.goal.' + g.id + '.now', g.vars)) + '</span></span><span></span></div>').join('') +
-      '</div></div></div>';
+      '</div></div></div>' + rivalsHtml() + '</div>';
 
     // Last season.
     const last = F.reports[F.reports.length - 1];
@@ -88,6 +89,23 @@ export function fleet(app: App): Screen {
       const [id, k] = b.dataset.cell!.split(':');
       openCell(id, Number(k));
     });
+  }
+
+  /** The three rival lines, and what their fares and fleets mean for your guests in each region. */
+  function rivalsHtml(): string {
+    const s = app.state, fare = s.fleet!.rivals?.fare ?? {};
+    let h = '<div class="panel"><div class="label" style="margin-bottom:.5rem">' + esc(t('fleet.rivals')) + '</div><div class="ledger">';
+    for (const L of lineSummary(s)) {
+      h += '<span><b>' + esc(L.name) + '</b><br><span class="sub2">' + esc(t('fleet.line.' + L.line)) + ' · ' + L.regions.map(r => esc(t('region.' + r))).join(', ') + '</span></span>' +
+        '<span class="mono">' + esc(t('fleet.rivals.line', { ships: L.ships, berths: L.berths.toLocaleString('en-US') })) + '</span>';
+    }
+    h += '</div><div class="label" style="margin:.8rem 0 .5rem">' + esc(t('fleet.rivals.fares')) + '</div><div class="ledger">';
+    for (const r of REGION_ORDER) {
+      const f = fare[r] ?? 1, reach = Math.round(rivalShare(s, r) * 100);
+      h += '<span>' + esc(t('region.' + r)) + '<br><span class="sub2">' + esc(t('fleet.rivals.reach', { pct: reach })) + '</span></span>' +
+        '<span class="mono ' + (f < 1 ? 'bad' : '') + '">' + esc(f < 1 ? t('fleet.rivals.fare.cut', { pct: Math.round((1 - f) * 100) }) : t('fleet.rivals.fare.normal')) + '</span>';
+    }
+    return h + '</div><p class="hint" style="margin-top:.6rem">' + esc(t('fleet.rivals.hint')) + '</p></div>';
   }
 
   function reportHtml(r: SeasonReport): string {
@@ -101,6 +119,10 @@ export function fleet(app: App): Screen {
     }
     h += '<tr><td colspan="5">' + esc(t('fleet.overhead')) + '</td><td class="num bad">' + kmoney(-r.overhead) + '</td></tr>' +
       '<tr><td colspan="5"><b>' + esc(t('fleet.report.total')) + '</b> <span class="sub2">' + esc(t('fleet.report.meta', { fuel: r.fuel.toFixed(2), rep0: r.repBefore.toFixed(1), rep1: r.repAfter.toFixed(1) })) + '</span></td><td class="num ' + (r.profit >= 0 ? 'good' : 'bad') + '"><b>' + kmoney(r.profit) + '</b></td></tr></tbody></table>';
+    h += '<div class="label" style="margin:.8rem 0 .4rem">' + esc(t('fleet.rivals.news')) + '</div>';
+    h += r.rivalNews?.length
+      ? '<ul class="fnews">' + r.rivalNews.map(n => '<li>' + esc(t(n.key, n.vars)) + '</li>').join('') + '</ul>'
+      : '<p class="sub2">' + esc(t('fleet.rivals.quiet')) + '</p>';
     return h;
   }
 
@@ -163,8 +185,8 @@ export function fleet(app: App): Screen {
       shipId, nights: dep?.nights ?? nightOptions(R).find(n => n >= 7) ?? nightOptions(R)[0], wait: dep?.wait ?? 0,
       stops: dep ? [...dep.stops] : [], end: from, fare: dep?.fare ?? R.market.rivalFare, lowSulfur: dep?.lowSulfur ?? true, offset: dep?.offset,
       from, day: planningDay(idx),
-      // Your other ships in the region share its guests: count this one in.
-      share: crowdShare((regionLoad(s, idx)[region] ?? 0) + (a.dep?.region === region ? 0 : 1)),
+      // Your other ships in the region share its guests: count this one in. Rival berths shrink or grow the pool.
+      share: crowdShare((regionLoad(s, idx)[region] ?? 0) + (a.dep?.region === region ? 0 : 1)) * rivalShare(s, region),
     };
     app.commit({ render: false });
     app.go('chartroom');
