@@ -211,14 +211,14 @@ export function chartroom(app: App): Screen {
     const rival = region.market.rivalFare;
     const line = pts.map(p => X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join(' L');
     let sv = '<line x1="10" x2="310" y1="' + Y(0) + '" y2="' + Y(0) + '" stroke="var(--ink-2)" stroke-width="1" stroke-dasharray="3 3"/>';
-    sv += '<path d="M' + line + ' L310 ' + Y(lo) + ' L10 ' + Y(lo) + ' Z" fill="color-mix(in srgb,var(--accent) 12%,transparent)"/>';
-    sv += '<path d="M' + line + '" fill="none" stroke="var(--accent)" stroke-width="2"/>';
-    sv += '<line x1="' + X(rival) + '" x2="' + X(rival) + '" y1="6" y2="72" stroke="var(--mass)" stroke-width="1.5"/><text x="' + (X(rival) + 3) + '" y="14" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-2)">' + esc(t('chart.rivalFare', { fare: rival })) + '</text>';
+    sv += '<path d="M' + line + ' L310 ' + Y(lo) + ' L10 ' + Y(lo) + ' Z" fill="color-mix(in srgb,var(--route) 10%,transparent)"/>';
+    sv += '<path d="M' + line + '" fill="none" stroke="var(--route)" stroke-width="2"/>';
+    sv += '<line x1="' + X(rival) + '" x2="' + X(rival) + '" y1="6" y2="72" stroke="var(--mass)" stroke-width="1.5"/><text x="' + (X(rival) + 3) + '" y="14" font-family="Montserrat, sans-serif" font-size="9" fill="var(--ink-2)">' + esc(t('chart.rivalFare', { fare: rival })) + '</text>';
     sv += '<line x1="' + X(best[0]) + '" x2="' + X(best[0]) + '" y1="' + Y(best[1]) + '" y2="72" stroke="var(--ink-2)" stroke-width="1" stroke-dasharray="2 2"/>';
     sv += '<circle cx="' + X(s.plan.fare) + '" cy="' + Y(F.profit) + '" r="4.5" fill="var(--sheet)" stroke="var(--ink)" stroke-width="2"/>';
-    sv += '<text x="10" y="86" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)">$' + FARE_MIN + '</text><text x="310" y="86" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)">$' + FARE_MAX + '</text>';
-    sv += '<text x="' + Math.min(255, Math.max(40, X(best[0]))) + '" y="86" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)">' + esc(t('chart.best', { fare: best[0], profit: kmoney(best[1]) })) + '</text>';
-    sv += '<text x="308" y="' + (Y(0) - 3) + '" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-2)">' + esc(t('chart.breakEven')) + '</text>';
+    sv += '<text x="10" y="86" font-family="Montserrat, sans-serif" font-size="10" fill="var(--ink-2)">$' + FARE_MIN + '</text><text x="310" y="86" text-anchor="end" font-family="Montserrat, sans-serif" font-size="10" fill="var(--ink-2)">$' + FARE_MAX + '</text>';
+    sv += '<text x="' + Math.min(255, Math.max(40, X(best[0]))) + '" y="86" text-anchor="middle" font-family="Montserrat, sans-serif" font-size="10" fill="var(--ink-2)">' + esc(t('chart.best', { fare: best[0], profit: kmoney(best[1]) })) + '</text>';
+    sv += '<text x="308" y="' + (Y(0) - 3) + '" text-anchor="end" font-family="Montserrat, sans-serif" font-size="9" fill="var(--ink-2)">' + esc(t('chart.breakEven')) + '</text>';
     $('#curve', root)!.innerHTML = sv;
     // Guest mix: mass and premium bookings against berths.
     const pax = Math.max(1, P.input.ship.pax);
@@ -274,8 +274,8 @@ export function chartroom(app: App): Screen {
     P.legs.forEach(l => {
       const bad = errAt.has(l.to);
       const pts = ptsAttr(region, l.r.pts);
-      s += '<polyline points="' + pts + '" fill="none" stroke="var(--water)" stroke-width="6" stroke-linejoin="round" opacity=".8"/>';
-      s += '<polyline points="' + pts + '" fill="none" stroke="' + (bad ? 'var(--err)' : 'var(--accent)') + '" stroke-width="2.6" stroke-linejoin="round"' + (bad ? ' stroke-dasharray="7 4"' : '') + '/>';
+      s += '<polyline points="' + pts + '" fill="none" stroke="var(--halo)" stroke-width="8" stroke-linejoin="round" opacity=".8"/>';
+      s += '<polyline points="' + pts + '" fill="none" stroke="' + (bad ? 'var(--err)' : 'var(--route)') + '" stroke-width="3.4" stroke-linejoin="round"' + (bad ? ' stroke-dasharray="7 4"' : '') + '/>';
       const pp = l.r.pts.map(p => proj(p[0], p[1]));
       let tot = 0;
       const seg: number[] = [];
@@ -284,7 +284,7 @@ export function chartroom(app: App): Screen {
       while (k < seg.length - 1 && half > seg[k]) { half -= seg[k]; k++; }
       const a = pp[k], b = pp[k + 1] ?? pp[k], f = seg[k] ? half / seg[k] : 0;
       const x = a[0] + (b[0] - a[0]) * f, y = a[1] + (b[1] - a[1]) * f, ang = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
-      s += '<path d="M-6 -5 L6 0 L-6 5 Z" transform="translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') rotate(' + ang.toFixed(0) + ')" fill="' + (bad ? 'var(--err)' : 'var(--accent)') + '"/>';
+      s += '<path d="M-6 -5 L6 0 L-6 5 Z" transform="translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') rotate(' + ang.toFixed(0) + ')" fill="' + (bad ? 'var(--err)' : 'var(--route)') + '"/>';
     });
     g.innerHTML = s;
     $('#mapStatus', root)!.textContent = P.legs.length ? t('chart.status', { nm: Math.round(P.nm), calls: P.calls.length, sea: P.seaDays }) : '';
@@ -306,12 +306,12 @@ export function chartroom(app: App): Screen {
       n.setAttribute('data-port', id);
       n.setAttribute('aria-label', p.name + ', ' + (st.ok ? t('chart.portAdd') : t(st.key, st.vars)));
       let inner = '';
-      if (idx.length) inner += '<circle class="mk" r="10" fill="var(--accent)"/><text text-anchor="middle" y="4" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" fill="var(--accent-ink)" stroke="none">' + idx.join(',') + '</text>';
+      if (idx.length) inner += '<circle class="mk" r="10" fill="var(--accent)"/><text text-anchor="middle" y="4" font-family="Montserrat, sans-serif" font-size="11" font-weight="600" fill="var(--accent-ink)" stroke="none">' + idx.join(',') + '</text>';
       else if (isHome) inner += '<rect class="mk" x="-7" y="-7" width="14" height="14" fill="var(--ink)"/>';
       else if (!st.ok) inner += '<g class="mk"><circle r="5.5" fill="var(--sheet)"/><path d="M-3 -3 L3 3 M3 -3 L-3 3" stroke="var(--muted)" stroke-width="1.6"/></g>';
       else inner += '<circle class="mk" r="5.5" fill="' + (p.turnaround ? 'var(--ink)' : 'var(--sheet)') + '"/>';
       if (!st.ok && st.locked) inner += '<text x="0" y="-9" text-anchor="middle" font-size="10" fill="var(--muted)" stroke="none">🔒</text>';
-      if (p.berth === 'tender') inner += '<text x="7" y="-5" font-size="9" fill="var(--ink-2)" stroke="none" font-family="IBM Plex Mono, monospace">T</text>';
+      if (p.berth === 'tender') inner += '<text x="7" y="-5" font-size="9" fill="var(--ink-2)" stroke="none" font-family="Montserrat, sans-serif">T</text>';
       const [dx, dy, an] = p.label;
       inner += '<text class="lbl" x="' + dx + '" y="' + dy + '" text-anchor="' + an + '">' + esc(p.name) + (p.country === 'PM' ? ' (FR)' : '') + '</text>';
       inner += '<circle class="hit" r="14"/>';
@@ -459,27 +459,27 @@ export function chartroom(app: App): Screen {
     let s = '';
     for (let d = 0; d <= nights; d++) {
       s += '<rect x="' + X(d * 24 - 4) + '" y="16" width="' + (X(10) - X(0)) + '" height="118" fill="var(--rule-2)" opacity=".6"/>';
-      s += '<line x1="' + X(d * 24) + '" x2="' + X(d * 24) + '" y1="12" y2="134" stroke="var(--rule)"/><text x="' + (X(d * 24) + 4) + '" y="11" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-2)">' + esc(t('chart.day', { n: d + 1 })) + '</text>';
+      s += '<line x1="' + X(d * 24) + '" x2="' + X(d * 24) + '" y1="12" y2="134" stroke="var(--rule)"/><text x="' + (X(d * 24) + 4) + '" y="11" font-family="Montserrat, sans-serif" font-size="11" fill="var(--ink-2)">' + esc(t('chart.day', { n: d + 1 })) + '</text>';
     }
-    s += '<line x1="' + X(plan.deadline) + '" x2="' + X(plan.deadline) + '" y1="14" y2="134" stroke="var(--err)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="' + (X(plan.deadline) - 4) + '" y="146" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--err)">' + esc(t('chart.guestsOff', { t: fmtClock(plan.deadline) })) + '</text>';
+    s += '<line x1="' + X(plan.deadline) + '" x2="' + X(plan.deadline) + '" y1="14" y2="134" stroke="var(--err)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="' + (X(plan.deadline) - 4) + '" y="146" text-anchor="end" font-family="Montserrat, sans-serif" font-size="10" fill="var(--err)">' + esc(t('chart.guestsOff', { t: fmtClock(plan.deadline) })) + '</text>';
     const yb = 40;
     plan.legs.forEach(l => {
-      s += '<line x1="' + X(l.dep) + '" x2="' + X(l.dep + l.sailH) + '" y1="' + yb + '" y2="' + yb + '" stroke="var(--accent)" stroke-width="3"/>';
+      s += '<line x1="' + X(l.dep) + '" x2="' + X(l.dep + l.sailH) + '" y1="' + yb + '" y2="' + yb + '" stroke="var(--route)" stroke-width="3"/>';
       if (l.idleH > 0.3) s += '<line x1="' + X(l.dep + l.sailH) + '" x2="' + X(l.arr) + '" y1="' + yb + '" y2="' + yb + '" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="2 3"/>';
     });
     s += '<rect x="' + (X(17) - 3) + '" y="' + (yb - 12) + '" width="6" height="24" fill="var(--ink)"/>';
     plan.calls.forEach(c => {
-      s += '<rect x="' + X(c.arr) + '" y="' + (yb - 12) + '" width="' + (X(c.dep) - X(c.arr)) + '" height="24" fill="var(--sheet)" stroke="var(--ink)" stroke-width="1.5"/><text x="' + ((X(c.arr) + X(c.dep)) / 2) + '" y="' + (yb + 4) + '" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" fill="var(--ink)">' + c.id + '</text>';
+      s += '<rect x="' + X(c.arr) + '" y="' + (yb - 12) + '" width="' + (X(c.dep) - X(c.arr)) + '" height="24" fill="var(--sheet)" stroke="var(--ink)" stroke-width="1.5"/><text x="' + ((X(c.arr) + X(c.dep)) / 2) + '" y="' + (yb + 4) + '" text-anchor="middle" font-family="Montserrat, sans-serif" font-size="11" font-weight="600" fill="var(--ink)">' + c.id + '</text>';
     });
     if (plan.legs.length === plan.input.stops.length + 1) {
       const l = plan.legs[plan.legs.length - 1];
       s += '<rect x="' + (X(l.arr) - 3) + '" y="' + (yb - 12) + '" width="6" height="24" fill="' + (l.arr > plan.deadline + 0.05 ? 'var(--err)' : 'var(--ink)') + '"/>';
     }
     const fy = (v: number) => 132 - Math.max(-0.15, v / ship.fuelCap) * 64;
-    s += '<line x1="20" x2="985" y1="' + fy(ship.fuelCap * FUEL_RESERVE) + '" y2="' + fy(ship.fuelCap * FUEL_RESERVE) + '" stroke="var(--warn)" stroke-dasharray="3 3"/><text x="22" y="' + (fy(ship.fuelCap * FUEL_RESERVE) - 3) + '" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--warn)">' + esc(t('chart.reserve')) + '</text>';
-    s += '<text x="22" y="' + (fy(ship.fuelCap) + 9) + '" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-2)">' + esc(t('chart.fuelTank', { t: ship.fuelCap })) + '</text>';
+    s += '<line x1="20" x2="985" y1="' + fy(ship.fuelCap * FUEL_RESERVE) + '" y2="' + fy(ship.fuelCap * FUEL_RESERVE) + '" stroke="var(--warn)" stroke-dasharray="3 3"/><text x="22" y="' + (fy(ship.fuelCap * FUEL_RESERVE) - 3) + '" font-family="Montserrat, sans-serif" font-size="9.5" fill="var(--warn)">' + esc(t('chart.reserve')) + '</text>';
+    s += '<text x="22" y="' + (fy(ship.fuelCap) + 9) + '" font-family="Montserrat, sans-serif" font-size="9.5" fill="var(--ink-2)">' + esc(t('chart.fuelTank', { t: ship.fuelCap })) + '</text>';
     s += '<polyline points="' + plan.fuelPts.map(([h, v]) => X(h).toFixed(1) + ',' + fy(v).toFixed(1)).join(' ') + '" fill="none" stroke="' + (plan.minFuel < 0 ? 'var(--err)' : 'var(--ink)') + '" stroke-width="2"/>';
-    plan.calls.filter(c => c.refuel).forEach(c => { s += '<text x="' + X(c.dep) + '" y="' + (fy(ship.fuelCap) - 4) + '" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ok)">' + esc(t('chart.refuel')) + '</text>'; });
+    plan.calls.filter(c => c.refuel).forEach(c => { s += '<text x="' + X(c.dep) + '" y="' + (fy(ship.fuelCap) - 4) + '" text-anchor="middle" font-family="Montserrat, sans-serif" font-size="9.5" fill="var(--ok)">' + esc(t('chart.refuel')) + '</text>'; });
     svg.innerHTML = s;
     $('#stripMeta', root)!.textContent = t('chart.stripMeta', { t: plan.burned.toFixed(1), pct: Math.round(plan.minFuel / ship.fuelCap * 100) });
   }

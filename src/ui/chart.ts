@@ -69,11 +69,11 @@ export function chartSvg(region: Region): string {
     const L = a % 90 === 0 ? 10 : a % 30 === 0 ? 6 : 3, ra = a * Math.PI / 180;
     s += '<line x1="' + (Math.sin(ra) * 44).toFixed(1) + '" y1="' + (-Math.cos(ra) * 44).toFixed(1) + '" x2="' + (Math.sin(ra) * (44 - L)).toFixed(1) + '" y2="' + (-Math.cos(ra) * (44 - L)).toFixed(1) + '" stroke-width=".8"/>';
   }
-  s += '<path d="M0 -34 L6 0 L0 34 L-6 0 Z M-34 0 L0 -5 L34 0 L0 5 Z" fill="var(--sheet)" stroke-width="1"/><path d="M0 -34 L6 0 L-6 0 Z" fill="var(--accent)" stroke="none"/><text y="-50" text-anchor="middle" fill="var(--ink-2)" stroke="none" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600">N</text></g>';
+  s += '<path d="M0 -34 L6 0 L0 34 L-6 0 Z M-34 0 L0 -5 L34 0 L0 5 Z" fill="var(--sheet)" stroke-width="1"/><path d="M0 -34 L6 0 L-6 0 Z" fill="var(--accent)" stroke="none"/><text y="-50" text-anchor="middle" fill="var(--ink-2)" stroke="none" font-family="Montserrat, sans-serif" font-size="11" font-weight="600">N</text></g>';
   // Scale bar. One minute of latitude is one nautical mile, so px per nm is scale / 60.
   const [sx, sy] = proj(region.scaleBar.lon, region.scaleBar.lat);
   const ppn = pxPerNm(region), step = ppn >= 0.8 ? 50 : 100, w = step * ppn;
-  s += '<g transform="translate(' + sx + ' ' + sy + ')" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)"><rect x="0" y="0" width="' + w + '" height="5" fill="var(--ink-2)"/><rect x="' + w + '" y="0" width="' + w + '" height="5" fill="var(--sheet)" stroke="var(--ink-2)"/><text x="0" y="17">0</text><text x="' + w + '" y="17" text-anchor="middle">' + step + '</text><text x="' + 2 * w + '" y="17" text-anchor="middle">' + 2 * step + ' nm</text></g>';
+  s += '<g transform="translate(' + sx + ' ' + sy + ')" font-family="Montserrat, sans-serif" font-size="10" fill="var(--ink-2)"><rect x="0" y="0" width="' + w + '" height="5" fill="var(--ink-2)"/><rect x="' + w + '" y="0" width="' + w + '" height="5" fill="var(--sheet)" stroke="var(--ink-2)"/><text x="0" y="17">0</text><text x="' + w + '" y="17" text-anchor="middle">' + step + '</text><text x="' + 2 * w + '" y="17" text-anchor="middle">' + 2 * step + ' nm</text></g>';
   s += '<g id="stormLayer"></g><g id="routeLayer"></g><g id="portLayer"></g><g id="shipLayer"></g>';
   // A tall chart (Europe) would run off the screen: cap its height, and its width to match.
   const cap = MH > MW * 0.8 ? ' style="max-width:calc(82vh * ' + (MW / MH).toFixed(3) + ');margin:0 auto"' : '';

@@ -27,7 +27,7 @@ function titleScreen() {
   app?.destroy();
   app = null;
   const auto = readSave(AUTOSAVE);
-  const card = el('<div class="title"><div class="card"><header><div><div class="label">' + esc(t('title.kicker')) + '</div><h1>' + esc(t('game.title')) + '</h1></div></header>' +
+  const card = el('<div class="title"><div class="card"><header class="title-head"><svg class="emblem" aria-hidden="true" viewBox="0 0 34 34"><circle cx="17" cy="17" r="15.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 19.5 Q17 26 26 19.5 M17 8 L17 23 M12.5 12 L21.5 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><div><div class="label">' + esc(t('title.kicker')) + '</div><h1>' + esc(t('game.title')) + '</h1></div></header>' +
     '<div class="body"><p class="hint" style="font-size:.95rem">' + esc(t('title.pitch')) + '</p><div class="modes"></div>' +
     '<div class="slots" id="slots"></div><label class="btn sm" style="align-self:flex-start">' + esc(t('menu.import')) + '<input type="file" accept=".json,application/json" class="sr" id="imp"></label></div></div></div>');
   const modes = card.querySelector('.modes')!;

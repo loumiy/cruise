@@ -101,7 +101,7 @@ export class App {
       (this.canOpen(id) ? '' : ' disabled title="' + esc(t('ui.drydockLocked')) + '"') + ' data-tut="nav-' + id + '">' + esc(t('screen.' + id)) + extra + '</button>';
     const dp = dpAvailable(s);
     $('#titlebar', this.root)!.innerHTML = '<div class="row">' +
-      '<span class="brand">' + esc(t('game.title')) + '</span>' +
+      '<span class="brand"><svg class="emblem" aria-hidden="true" viewBox="0 0 34 34"><circle cx="17" cy="17" r="15.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 19.5 Q17 26 26 19.5 M17 8 L17 23 M12.5 12 L21.5 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>' + esc(t('game.title')) + '</span>' +
       '<nav class="tabs" aria-label="' + esc(t('ui.screens')) + '">' + tab('chartroom') + tab('drydock', this.canOpen('drydock') ? '' : ' 🔒') +
       tab('company', dp > 0 ? ' <span class="badge" style="background:var(--accent)" title="' + esc(t('company.dpBadge', { n: dp })) + '">' + dp + '</span>' : '') + '</nav>' +
       '<div class="stats">' +

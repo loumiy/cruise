@@ -465,7 +465,7 @@ export function drydock(app: App): Screen {
         s += '<rect x="' + (X0 + c * cw + 1) + '" y="' + (y + 1) + '" width="' + (cw - 2) + '" height="' + (dh - 2) + '" fill="' + fill + '" stroke="' + (err ? 'var(--err)' : 'var(--rule)') + '" stroke-width="' + (err ? 2 : 1) + '"/>';
       }
       s += '<g class="dk" data-deck="' + d + '" style="cursor:pointer"><rect x="0" y="' + y + '" width="' + (L + cw * 0.8) + '" height="' + dh + '" fill="transparent" stroke="' + (d === d0 ? 'var(--accent)' : 'none') + '" stroke-width="2.5"/>' +
-        '<text x="4" y="' + (y + dh / 2 + 4) + '" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" fill="var(--ink)">D' + d + '</text></g>';
+        '<text x="4" y="' + (y + dh / 2 + 4) + '" font-family="Montserrat, sans-serif" font-size="12" font-weight="600" fill="var(--ink)">D' + d + '</text></g>';
     }
     const fu = h.fixed.find(f => f.type === 'FU');
     if (fu) s += '<rect x="' + (X0 + fu.c * cw + 4) + '" y="' + (deckY(nd) - 24) + '" width="' + (cw * fu.w - 8) + '" height="24" fill="var(--c-locked)" stroke="var(--ink)" stroke-width="1.5"/>';
@@ -475,8 +475,8 @@ export function drydock(app: App): Screen {
     const gx = L + cw * 0.8 + 28;
     const gmS = R.gm >= GM_MIN ? 'var(--ok)' : R.gm > 0 ? 'var(--warn)' : 'var(--err)';
     s += '<line x1="' + gx + '" y1="' + mz(0) + '" x2="' + gx + '" y2="' + mz(h.decks[nd - 1].z + 2) + '" stroke="var(--rule)" stroke-width="2"/>';
-    s += '<line x1="' + (gx - 10) + '" y1="' + mz(h.km) + '" x2="' + (gx + 10) + '" y2="' + mz(h.km) + '" stroke="var(--ink)" stroke-width="2"/><text x="' + (gx + 14) + '" y="' + (mz(h.km) + 4) + '" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--ink)">M</text>';
-    s += '<circle cx="' + gx + '" cy="' + mz(R.kg) + '" r="6" fill="' + gmS + '" stroke="var(--ink)" stroke-width="1.5"/><text x="' + (gx + 14) + '" y="' + (mz(R.kg) + 4) + '" font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--ink)">G</text>';
+    s += '<line x1="' + (gx - 10) + '" y1="' + mz(h.km) + '" x2="' + (gx + 10) + '" y2="' + mz(h.km) + '" stroke="var(--ink)" stroke-width="2"/><text x="' + (gx + 14) + '" y="' + (mz(h.km) + 4) + '" font-family="Montserrat, sans-serif" font-size="12" fill="var(--ink)">M</text>';
+    s += '<circle cx="' + gx + '" cy="' + mz(R.kg) + '" r="6" fill="' + gmS + '" stroke="var(--ink)" stroke-width="1.5"/><text x="' + (gx + 14) + '" y="' + (mz(R.kg) + 4) + '" font-family="Montserrat, sans-serif" font-size="12" fill="var(--ink)">G</text>';
     svg.innerHTML = s;
     svg.querySelectorAll<SVGGElement>('.dk').forEach(g => g.addEventListener('click', () => { app.ui.deck = Number(g.dataset.deck); selected = null; render(); }));
     $('#gmTag', root)!.innerHTML = esc(t('drydock.gmTag', { kg: R.kg.toFixed(2) })) + ' · GM <b style="color:' + gmS + '">' + R.gm.toFixed(2) + ' m</b>';

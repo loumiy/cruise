@@ -83,8 +83,8 @@ function draw(cv: HTMLCanvasElement, design: Design, rep: DesignReport, angDeg: 
   x.strokeStyle = cssVar('--sea-2'); x.lineWidth = 2; x.beginPath();
   for (let px = 0; px <= W; px += 12) x.lineTo(px, wave(px));
   x.stroke();
-  x.fillStyle = cssVar('--ink'); x.font = '600 26px "IBM Plex Mono", monospace';
+  x.fillStyle = cssVar('--ink'); x.font = '600 26px "Montserrat", sans-serif';
   x.fillText(t('trial.heel', { deg: Math.abs(angDeg) > 99 ? '—' : Math.abs(angDeg).toFixed(1) + '°' }), 24, 44);
-  x.font = '500 20px "IBM Plex Mono", monospace';
+  x.font = '500 20px "Montserrat", sans-serif';
   x.fillText(t('trial.gm', { gm: rep.gm.toFixed(2) }), 24, 74);
 }

@@ -59,6 +59,7 @@ Open the printed URL (default http://localhost:5173). Other scripts:
 - **One-time prompts.** Each new mechanic gets one sentence the first time it matters (fuel stops, late returns, the crossing, air conditioning, full piers, crowds, storms, the island), then never again.
 - **Onboarding.** The guided first 15 minutes from the doc, one sentence and one action per step, skippable.
 - **Saves.** Autosave after every voyage and build change, three manual slots, export/import to a file, versioned with a migration hook.
+- **Look: Resort Deck.** A navy header with a gold emblem, white rounded cards, pill buttons, and gold for the main actions and numbered stops. Charts show a bright turquoise sea with sand-coloured land and a navy route, and each chapter's sea has its own shade of blue. Type is Montserrat for headings and figures, with Source Sans 3 for text. Dark mode switches to deep navy with a gold route. This replaces the design doc's drafting-office style, after a round of style mockups.
 - **Accessibility.** Every state has an icon as well as a colour. Text size 90–150%. Light/dark themes. Reduced motion. Voyage speed and an instant-result option. Sound effects and an ambience bed, both made in code, with volume sliders.
 
 ## Layout

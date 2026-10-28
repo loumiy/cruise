@@ -294,7 +294,7 @@
  "trial.next": "You can commission this design now.",
  "trial.heel": "HEEL {deg}",
  "trial.gm": "GM {gm} m",
- "chart.head": "Chart · {region} · sea lanes in grey · 1 px ≈ {nm} nm",
+ "chart.head": "Chart · {region} · dotted lines are sea lanes · 1 px ≈ {nm} nm",
  "chart.aria": "Nautical chart of {region}",
  "chart.strip": "Schedule and fuel",
  "chart.stripAria": "Voyage schedule by day, with fuel level",
