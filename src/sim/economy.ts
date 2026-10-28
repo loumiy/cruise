@@ -13,8 +13,10 @@ export const NIGHTS_DEMAND: Record<number, number> = { 3: 1.15, 4: 1, 5: 0.92, 6
 /** What the economy needs from a plan. A real Plan fits; so does the Drydock's typical cruise. */
 export interface PlanSummary {
   nights: number; score: number; burned: number; tolls: number; pilotage: number; seasonDemand: number;
-  calls: { callFee: number; headTax: number; tenderFee: number }[];
+  calls: { callFee: number; headTax: number; tenderFee: number; spend?: number }[];
   idleDays: number;
+  /** Most rival guests ashore at any one call. Premium guests mind crowds. */
+  crowd?: number;
 }
 
 export interface Market { rep: number; demandBonus: number }
@@ -32,13 +34,15 @@ export function summarise(plan: Plan, idleDays = 0): PlanSummary {
     seasonDemand: plan.season?.demand ?? 1, idleDays,
     calls: plan.calls.map(c => {
       const p = P[c.id];
-      return { callFee: p.callFee, headTax: p.headTax, tenderFee: p.berth === 'tender' ? (p.tenderFee ?? 2500) : 0 };
+      const tender = p.berth === 'tender' || c.tender;
+      return { callFee: p.callFee, headTax: p.headTax, tenderFee: tender ? (p.tenderFee ?? 2500) : 0, spend: p.spend };
     }),
+    crowd: plan.calls.reduce((a, c) => Math.max(a, c.crowd), 0),
   };
 }
 
 /** Two markets: mass guests shop on price, premium guests pay more for a better trip. */
-export function demand(region: Region, ship: Pick<ShipSpecs, 'luxury'>, p: Pick<PlanSummary, 'score' | 'nights' | 'seasonDemand'>, fare: number, mk: Market) {
+export function demand(region: Region, ship: Pick<ShipSpecs, 'luxury'>, p: Pick<PlanSummary, 'score' | 'nights' | 'seasonDemand' | 'crowd'>, fare: number, mk: Market) {
   const m = region.market;
   const appealF = Math.pow(Math.max(p.score, 1) / 60, 1.4);
   const repF = Math.max(0.6, 1 + 0.1 * (mk.rep - 3)) * (1 + mk.demandBonus);
@@ -46,7 +50,8 @@ export function demand(region: Region, ship: Pick<ShipSpecs, 'luxury'>, p: Pick<
   const lux = Math.min(1.6, ship.luxury);
   const eff = fare / (1 + 0.35 * lux);
   const mass = m.mass * k * Math.min(3, Math.exp(-(eff - m.rivalFare) / m.massSens));
-  const premium = m.premium * k * (0.6 + 0.5 * Math.min(1, lux)) * Math.min(2.5, Math.exp(-(eff - m.rivalFare) / m.premiumSens));
+  const crowdF = 1 - Math.min(0.6, (p.crowd ?? 0) / 10000);
+  const premium = m.premium * k * crowdF * (0.6 + 0.5 * Math.min(1, lux)) * Math.min(2.5, Math.exp(-(eff - m.rivalFare) / m.premiumSens));
   return { mass, premium };
 }
 
@@ -57,7 +62,7 @@ export function finance(region: Region, ship: ShipSpecs, p: PlanSummary, fare: n
   const bookedMass = Math.round(booked * share), bookedPremium = booked - bookedMass;
   const n = p.nights;
   const rev = booked * fare * n;
-  const onboard = Math.round(booked * n * ship.spend);
+  const onboard = Math.round(booked * n * ship.spend + booked * p.calls.reduce((a, c) => a + (c.spend ?? 0), 0));
   const crew = ship.crew * CREW_WAGE * n;
   const lease = ship.lease * (n + p.idleDays);
   const food = booked * n * FOOD_PER_GUEST;

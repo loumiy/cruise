@@ -1,8 +1,9 @@
 // The Chartroom planner: schedule, speed, fuel, port rules, the PVSA and appeal.
-import type { Port, Region, SeasonDef } from './data';
+import type { Port, Region, Rival, SeasonDef } from './data';
 import type { ShipSpecs } from './ship';
 import { route, type Route } from './route';
-import { seasonOf, seasonCloseDay } from './calendar';
+import { seasonOf, seasonCloseDay, weekdayOf } from './calendar';
+import { forecastHit } from './storms';
 import { NO_TECH, type TechMods } from './tech';
 import type { Vars } from './strings';
 
@@ -31,7 +32,31 @@ export type PlanLevel = 'err' | 'warn' | 'info';
 export interface PlanIssue { lvl: PlanLevel; key: string; vars?: Vars; at?: string }
 
 export interface Leg { from: string; to: string; r: Route; dep: number; arr: number; speed: number; sailH: number; idleH: number; fuel: number }
-export interface Call { id: string; arr: number; dep: number; refuel: boolean }
+export interface Call {
+  id: string; arr: number; dep: number; refuel: boolean;
+  /** 0 = Sunday. */
+  weekday: number;
+  rivals: Rival[];
+  /** Rival guests ashore that day. */
+  crowd: number;
+  /** Piers were full, so the ship anchors and tenders. */
+  tender: boolean;
+}
+
+/** Rival ships calling at a port on a weekday. */
+export function rivalsAt(region: Region, port: string, weekday: number): Rival[] {
+  return region.rivals.filter(r => r.calls[String(weekday)] === port);
+}
+
+/** Piers left for us at a port on a weekday. Infinity when the port has no berth limit. */
+export function piersFree(region: Region, port: string, weekday: number): number {
+  const p = region.ports[port];
+  if (p.berths == null) return Infinity;
+  return p.berths - rivalsAt(region, port, weekday).length;
+}
+
+/** Crowds cost appeal: up to 4 points when 8,000 rival guests are ashore. */
+export const crowdPenalty = (crowd: number) => Math.min(4, Math.round(crowd / 2000 * 10) / 10);
 
 export interface Plan {
   input: PlanInput;
@@ -47,7 +72,7 @@ export interface Plan {
 
 export type PortCheck = { ok: true } | { ok: false; key: string; vars?: Vars; locked?: boolean };
 
-export function portStatus(region: Region, id: string, ship: Pick<ShipSpecs, 'draft' | 'length'>, openGroups: string[], sandbox = false): PortCheck {
+export function portStatus(region: Region, id: string, ship: Pick<ShipSpecs, 'draft' | 'length'> & { beam?: number }, openGroups: string[], sandbox = false): PortCheck {
   const p = region.ports[id];
   if (!p) return { ok: false, key: 'plan.port.unknown' };
   if (p.closed) return { ok: false, key: 'plan.port.closed', vars: { port: p.name } };
@@ -57,6 +82,9 @@ export function portStatus(region: Region, id: string, ship: Pick<ShipSpecs, 'dr
   }
   if (p.berth === 'pier' && p.maxLength != null && ship.length > p.maxLength) {
     return { ok: false, key: 'plan.port.tooLong', vars: { port: p.name, max: p.maxLength, len: ship.length } };
+  }
+  if (p.maxBeam != null && ship.beam != null && ship.beam > p.maxBeam) {
+    return { ok: false, key: 'plan.port.tooWide', vars: { port: p.name, max: p.maxBeam, beam: ship.beam } };
   }
   return { ok: true };
 }
@@ -86,6 +114,8 @@ export function planVoyage(input: PlanInput): Plan {
   const deadline = nights * 24 + ARRIVE_BY;
   const canals: string[] = [], scenic: string[] = [];
   const size = { draft: ship.draft, air: ship.air, beam: ship.beam };
+  // Air conditioning in hot regions raises the hotel load.
+  const hotel = ship.hotelTph * (region.hotelMult ?? 1);
 
   // With no stops there is nothing to schedule yet; the "no stops" error says what to do.
   for (let i = 0; input.stops.length && i < seq.length - 1; i++) {
@@ -108,18 +138,22 @@ export function planVoyage(input: PlanInput): Plan {
     speed = Math.min(ship.vmax, Math.max(Math.min(MIN_SPEED, ship.vmax), speed));
     const sailH = r.nm / speed, idleH = Math.max(0, arr - t - sailH);
     const slow = speed < ship.vmax * 0.75 ? tech.slowBurn : 1;
-    const f = r.nm * ship.burnPerNm * slow * Math.pow(speed / ship.vmax, 2) + ship.hotelTph * (sailH + idleH);
+    const f = r.nm * ship.burnPerNm * slow * Math.pow(speed / ship.vmax, 2) + hotel * (sailH + idleH);
     fuel -= f; burned += f; fuelPts.push([arr, fuel]);
     if (fuel < minFuel) { minFuel = fuel; minFuelAt = b; }
     legs.push({ from: a, to: b, r, dep: t, arr, speed, sailH, idleH, fuel: f });
     if (!last) {
       const d = Math.floor(arr / 24), dep = Math.max(arr + MIN_STAY, d * 24 + DEPART_HOUR);
-      const pf = ship.hotelTph * 0.6 * tech.portHotel * (dep - arr);
+      const pf = hotel * 0.6 * tech.portHotel * (dep - arr);
       fuel -= pf; burned += pf; fuelPts.push([dep, fuel]);
       if (fuel < minFuel) { minFuel = fuel; minFuelAt = b; }
       const refuel = !!P[b].fuel && fuel >= 0;
       if (refuel) { fuel = ship.fuelCap; fuelPts.push([dep, fuel]); }
-      calls.push({ id: b, arr, dep, refuel });
+      const weekday = weekdayOf(input.departDay + Math.floor(arr / 24));
+      const rivals = P[b].privateIsland ? [] : rivalsAt(region, b, weekday);
+      const full = P[b].berths != null && rivals.length >= P[b].berths!;
+      calls.push({ id: b, arr, dep, refuel, weekday, rivals, crowd: rivals.reduce((a, r) => a + r.guests, 0), tender: full && !!P[b].tenderOk });
+      if (P[b].canalCall) { tolls += P[b].canalCall!; if (!canals.includes('panama')) canals.push('panama'); }
       t = dep;
     } else t = arr;
   }
@@ -127,7 +161,7 @@ export function planVoyage(input: PlanInput): Plan {
 
   // Rules.
   if (!season) E('plan.offSeason');
-  else if (input.departDay + nights > seasonCloseDay(region, input.departDay)) E('plan.seasonEnds');
+  else if (!region.season.yearRound && input.departDay + nights > seasonCloseDay(region, input.departDay)) E('plan.seasonEnds');
   if (!input.stops.length) E('plan.noStops');
   input.stops.forEach(id => {
     const s = portStatus(region, id, ship, input.openGroups, input.sandbox);
@@ -151,6 +185,17 @@ export function planVoyage(input: PlanInput): Plan {
   for (let k = 2; k <= nights; k++) if (!calls.some(c => c.arr < k * 24 && c.dep > (k - 1) * 24)) seaDays++;
   if (input.stops.length && nights <= 5 && seaDays > 1) W('plan.seaDays', { n: seaDays, nights });
   calls.filter(c => P[c.id].berth === 'tender').forEach(c => I('plan.tender', { port: P[c.id].name }, c.id));
+  for (const c of calls) {
+    const p = P[c.id];
+    const day = '@weekday.' + c.weekday;
+    if (p.berths != null && c.rivals.length >= p.berths) {
+      if (c.tender) W('plan.piersFullTender', { port: p.name, day }, c.id);
+      else E('plan.piersFull', { port: p.name, day }, c.id);
+    }
+    if (c.crowd >= 6000) W('plan.crowd', { port: p.name, n: c.crowd.toLocaleString('en-US'), day }, c.id);
+    const hit = forecastHit(region, [p.lon, p.lat], input.departDay + c.arr / 24, input.departDay);
+    if (hit) W('plan.storm', { storm: hit.storm.name, port: p.name }, c.id);
+  }
   canals.forEach(c => I('plan.canal', { canal: '@canal.' + c }));
 
   // Appeal: each new port adds its appeal, each theme adds 2.5, on a curve.
@@ -161,8 +206,10 @@ export function planVoyage(input: PlanInput): Plan {
     if (done.has(c.id)) continue;
     done.add(c.id);
     const p = P[c.id];
-    const a = p.appeal[sIdx] - (p.berth === 'tender' ? tech.tenderPenalty : 0);
+    const a = p.appeal[sIdx] - (p.berth === 'tender' || c.tender ? tech.tenderPenalty : 0);
     raw += a; parts.push({ key: 'appeal.port', vars: { port: p.name }, v: a });
+    const cp = crowdPenalty(c.crowd);
+    if (cp) { raw -= cp; parts.push({ key: 'appeal.crowd', vars: { port: p.name }, v: -cp }); }
     p.tags.forEach(x => tags.add(x));
   }
   if (tags.size) { const tb = tags.size * 2.5; raw += tb; parts.push({ key: 'appeal.variety', vars: { n: tags.size }, v: tb }); }

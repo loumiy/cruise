@@ -1,6 +1,7 @@
 // The app shell: title bar, screen switching, modals, toasts, saves and settings.
 import { t } from '../sim/strings';
-import { companyDay, currentGoal, dpAvailable, newGame, type GameState } from '../sim/game';
+import { companyDay, currentGoal, dpAvailable, newGame, regionOf, type GameState, type GraduationResult } from '../sim/game';
+import { REGIONS } from '../sim/data';
 import { fmtDate } from '../sim/calendar';
 import { AUTOSAVE, SLOTS, deserialise, readSave, serialise, slotInfo, writeSave } from '../sim/save';
 import { $, esc, money, stars, el } from './dom';
@@ -87,6 +88,7 @@ export class App {
   }
 
   renderAll() {
+    document.documentElement.setAttribute('data-tint', regionOf(this.state).tint);
     this.renderTop();
     this.current?.render();
     this.tutorial.render();
@@ -144,6 +146,20 @@ export class App {
     document.body.appendChild(wrap);
     (foot.querySelector('.btn.primary') as HTMLElement | null ?? foot.querySelector('.btn') as HTMLElement | null)?.focus();
     return close;
+  }
+
+  /** The card shown when a new chapter starts: what carried over and the region's new rules. */
+  chapterIntro(r: GraduationResult) {
+    const to = REGIONS[r.to];
+    const rules = [1, 2, 3, 4, 5].map(i => 'chapter.' + to.id + '.rule' + i).filter(k => t(k) !== '⟨' + k + '⟩');
+    const body = '<p class="hint" style="font-size:.95rem">' + esc(t('chapter.' + to.id + '.intro')) + '</p>' +
+      '<div><div class="label" style="margin-bottom:4px">' + esc(t('chapter.newRules')) + '</div><ul>' + rules.map(k => '<li>' + esc(t(k)) + '</li>').join('') + '</ul></div>' +
+      '<div class="ledger"><span>' + esc(t('chapter.ships')) + '</span><span class="mono">' + esc(r.ships.join(', ')) + '</span>' +
+      (r.left.length ? '<span>' + esc(t('chapter.left')) + '</span><span class="mono">' + esc(r.left.join(', ')) + '</span>' : '') +
+      (this.state.mode === 'sandbox' ? '' : '<span>' + esc(t('ui.cash')) + '</span><span class="mono">' + money(r.cashBefore) + ' → ' + money(r.cashAfter) + '</span>') +
+      '<span>' + esc(t('ui.reputation')) + '</span><span class="mono">' + r.repBefore.toFixed(1) + ' → ' + r.repAfter.toFixed(1) + '</span></div>' +
+      (r.firsts.length ? '<div class="first">' + esc(t('chapter.firstCrossing')) + '</div>' : '');
+    this.modal({ title: t('chapter.title', { n: to.chapter, region: t('region.' + to.id) }), body, buttons: [{ label: t('chapter.start'), primary: true }] });
   }
 
   // ---------- menu: saves and settings ----------

@@ -1,7 +1,7 @@
 // Company: cash, reputation, fleet, tech tree, milestones and firsts.
 import { t, tn } from '../sim/strings';
-import { FIRST_DP, MILESTONES, TECH } from '../sim/data';
-import { dpAvailable, buyTech, specsOf, regionOf, refitQuote, isSandbox, bpById } from '../sim/game';
+import { FIRST_DP, MILESTONES, TECH, REGION_ORDER, REGIONS } from '../sim/data';
+import { dpAvailable, buyTech, specsOf, regionOf, refitQuote, isSandbox, bpById, canLeaseIsland, leaseIsland, moveRegion, ISLAND_LEASE } from '../sim/game';
 import { canBuy, tierOpen } from '../sim/tech';
 import { fmtDate } from '../sim/calendar';
 import { esc, money, kmoney, stars, ICON, el } from './dom';
@@ -59,6 +59,22 @@ export function company(app: App): Screen {
     h += '</div></div>';
     h += '</div><div style="display:flex;flex-direction:column;gap:.9rem">';
 
+    // Private island
+    const island = Object.entries(region.ports).find(([, p]) => p.lockedBy === 'island');
+    if (island) {
+      const owned = s.unlocked.portGroups.includes('island');
+      const can = canLeaseIsland(s);
+      h += '<div class="panel"><div class="label" style="margin-bottom:.4rem">' + esc(t('company.island.title', { name: island[1].name })) + '</div><div class="island">' +
+        '<span class="hint" style="flex:1 1 14rem">' + esc(t(owned ? 'company.island.ownedDesc' : 'company.island.desc', { spend: island[1].spend ?? 0 })) + '</span>' +
+        (owned ? '<span class="good">' + ICON.ok + ' ' + esc(t('company.owned')) + '</span>'
+          : '<button type="button" class="btn primary" data-lease' + (can.ok ? '' : ' disabled title="' + esc(t(can.key, can.vars ? { cost: money(ISLAND_LEASE) } : undefined)) + '"') + '>' + esc(t('company.island.lease', { cost: kmoney(ISLAND_LEASE) })) + '</button>') +
+        '</div></div>';
+    }
+    if (isSandbox(s)) {
+      h += '<div class="panel"><div class="label" style="margin-bottom:.4rem">' + esc(t('company.region')) + '</div><div class="seg">' +
+        REGION_ORDER.map(id => '<button type="button" data-region="' + id + '" aria-pressed="' + (id === s.region) + '">' + esc(t('region.' + id)) + '</button>').join('') + '</div></div>';
+    }
+
     // Milestones
     h += '<div class="panel"><div class="label" style="margin-bottom:.5rem">' + esc(t('company.milestones', { region: region.name })) + '</div><div class="ms">' +
       (MILESTONES[s.region] ?? []).map(m => {
@@ -67,7 +83,7 @@ export function company(app: App): Screen {
       }).join('') + '</div></div>';
 
     // Firsts
-    const all = [...Object.keys(region.ports).map(id => 'port:' + id), 'region:' + region.id, ...Object.keys(FIRST_DP).filter(k => k !== 'port' && k !== 'region')];
+    const all = [...Object.keys(region.ports).filter(id => !region.ports[id].closed).map(id => 'port:' + id), 'region:' + region.id, ...Object.keys(FIRST_DP).filter(k => k !== 'port' && k !== 'region')];
     const got = all.filter(f => s.firsts.includes(f)).length;
     h += '<div class="panel"><div class="label" style="margin-bottom:.5rem">' + esc(t('company.firsts', { got, of: all.length })) + '</div><div class="firsts">' +
       all.map(f => '<span class="' + (s.firsts.includes(f) ? 'got' : '') + '">' + (s.firsts.includes(f) ? ICON.ok + ' ' : '') + esc(firstName(f, region)) + '</span>').join('') + '</div></div>';
@@ -75,7 +91,7 @@ export function company(app: App): Screen {
     // History
     h += '<div class="panel"><div class="label" style="margin-bottom:.5rem">' + esc(t('company.history')) + '</div>' +
       (s.log.length ? '<table class="fleet"><thead><tr><th>#</th><th>' + esc(t('company.col.cruise')) + '</th><th>' + esc(t('company.col.booked')) + '</th><th>' + esc(t('company.col.sat')) + '</th><th>' + esc(t('company.col.profit')) + '</th></tr></thead><tbody>' +
-        s.log.slice().reverse().slice(0, 20).map(v => '<tr><td class="num">' + v.n + '</td><td>' + esc(v.ship) + '<br><span class="sub2">' + esc(fmtDate(v.day, false)) + ' · ' + esc(tn('report.nights', v.nights)) + ' · ' + esc(v.route.map(id => region.ports[id]?.name ?? id).join(' → ')) + '</span></td>' +
+        s.log.slice().reverse().slice(0, 20).map(v => '<tr><td class="num">' + v.n + '</td><td>' + esc(v.ship) + '<br><span class="sub2">' + esc(fmtDate(v.day, false)) + ' · ' + esc(tn('report.nights', v.nights)) + ' · ' + esc(v.route.map(id => (REGIONS[v.region] ?? region).ports[id]?.name ?? id).join(' → ')) + '</span></td>' +
           '<td class="num">' + v.booked + '/' + v.pax + '</td><td class="num">' + v.sat + '</td><td class="num ' + (v.profit >= 0 ? 'good' : 'bad') + '">' + kmoney(v.profit) + '</td></tr>').join('') + '</tbody></table>'
         : '<p class="hint">' + esc(t('chart.noVoyages')) + '</p>') + '</div>';
     h += '</div></div>';
@@ -85,6 +101,17 @@ export function company(app: App): Screen {
       const body = el('<div class="field"><label class="label" for="cn">' + esc(t('company.nameLabel')) + '</label><input class="txt" id="cn" maxlength="40" value="' + esc(s.company) + '"></div>');
       app.modal({ title: t('company.rename'), body, buttons: [{ label: t('ui.cancel') }, { label: t('ui.ok'), primary: true, action: () => { const v = (body.querySelector('#cn') as HTMLInputElement).value.trim(); if (v) { s.company = v; app.commit(); } } }] });
     };
+    root.querySelector<HTMLButtonElement>('[data-lease]')?.addEventListener('click', () => {
+      const r = leaseIsland(s);
+      if ('ok' in r) { if (!r.ok) app.toast(t(r.key)); return; }
+      sound.good(app.settings);
+      app.toast(t('company.island.done'), 'ok');
+      for (const m of r.milestones) app.toast(t('report.milestone', { name: t('milestone.' + m + '.name') }), 'ok');
+      app.commit();
+    });
+    root.querySelectorAll<HTMLButtonElement>('[data-region]').forEach(b => b.onclick = () => {
+      if (moveRegion(s, b.dataset.region!).ok) { app.commit({ render: false }); app.go('company'); }
+    });
     root.querySelectorAll<HTMLButtonElement>('[data-plan]').forEach(b => b.onclick = () => { s.plan.shipId = b.dataset.plan!; app.commit({ render: false }); app.go('chartroom'); });
     root.querySelectorAll<HTMLButtonElement>('[data-design]').forEach(b => b.onclick = () => { app.ui.bpId = b.dataset.design!; app.go('drydock'); });
     root.querySelectorAll<HTMLButtonElement>('[data-tech]').forEach(b => b.onclick = () => {

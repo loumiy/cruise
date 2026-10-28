@@ -8,6 +8,10 @@ import milestonesJson from '../../data/milestones.json';
 import neRegion from '../../data/regions/northeast.json';
 import nePorts from '../../data/ports/northeast.json';
 import neLanes from '../../data/lanes/northeast.json';
+import caRegion from '../../data/regions/caribbean.json';
+import caPorts from '../../data/ports/caribbean.json';
+import caLanes from '../../data/lanes/caribbean.json';
+import rivalsJson from '../../data/rivals.json';
 
 export type Role = 'bottom' | 'lower' | 'middle' | 'upper' | 'top' | 'boat' | 'any';
 export type Cat = 'cabin' | 'venue' | 'service' | 'machine' | 'access' | 'safety';
@@ -34,9 +38,18 @@ export interface Hull {
 }
 
 export interface Port {
-  name: string; country: 'US' | 'CA' | 'FR'; lon: number; lat: number; appeal: number[]; tags: string[];
-  berth: 'pier' | 'tender'; maxDraft?: number; maxLength?: number; fuel?: boolean; turnaround?: boolean;
+  name: string; country: string; lon: number; lat: number; appeal: number[]; tags: string[];
+  berth: 'pier' | 'tender'; maxDraft?: number; maxLength?: number; maxBeam?: number; fuel?: boolean; turnaround?: boolean;
   callFee: number; headTax: number; tenderFee?: number; lockedBy?: string; closed?: boolean;
+  /** Ship berths at the pier. Rivals fill them on set weekdays. */
+  berths?: number;
+  /** When the piers are full, ships can anchor and tender instead. */
+  tenderOk?: boolean;
+  privateIsland?: boolean;
+  /** Extra onboard spending per guest on the day of the call. */
+  spend?: number;
+  /** Toll for a partial canal transit made as part of the call. */
+  canalCall?: number;
   label: [number, number, string];
 }
 
@@ -45,14 +58,27 @@ export interface EdgeOpts {
   via?: [number, number][]; scenic?: string; pilotage?: number;
 }
 
-export interface SeasonDef { id: string; months: number[]; appealIdx: number; demand: number; galeOdds: number; fogOdds: number }
+export interface SeasonDef { id: string; months: number[]; appealIdx: number; demand: number; galeOdds: number; fogOdds: number; storms?: number }
+
+export interface Graduation {
+  id: string; locked?: boolean; toRegion?: string; toPort?: string; from?: string[]; nm?: Record<string, number>;
+  speed?: number; swell?: number; requires?: string; grant?: number; keepCash?: number;
+}
+
+export interface Rival { ship: string; line: string; guests: number; calls: Record<string, string> }
 
 export interface Region {
   id: string; name: string; chapter: number;
   bounds: { lon0: number; lon1: number; lat0: number; lat1: number; refLat: number; scale: number };
-  tint: string; season: { openMonth: number; closeMonth: number }; seasons: SeasonDef[];
+  tint: string; season: { openMonth: number; closeMonth: number; yearRound?: boolean }; seasons: SeasonDef[];
   market: { mass: number; massSens: number; premium: number; premiumSens: number; rivalFare: number };
   fuelPrice: number; scenicBonus: number;
+  /** Air conditioning: multiplies hotel fuel use. */
+  hotelMult?: number;
+  soundings?: { shallow: [number, number]; deep: [number, number]; deepBox?: [number, number, number, number] };
+  graduation?: Graduation;
+  stormNames?: string[];
+  rivals: Rival[];
   land: Record<string, [number, number][]>;
   labels: { lon: number; lat: number; text: string; kind: string; rot?: number }[];
   compass: { lon: number; lat: number }; scaleBar: { lon: number; lat: number };
@@ -76,7 +102,10 @@ export interface EventDef {
 
 export interface MilestoneDef {
   id: string;
-  test: { voyages?: number; visit?: string; profit?: number; cash?: number; rep?: number };
+  test: {
+    voyages?: number; visit?: string; profit?: number; cash?: number; rep?: number;
+    regionVoyages?: number; soldOutPax?: number; island?: boolean; stormProfits?: number; weekGuests?: number;
+  };
   reward: { cash?: number; unlock?: string; unlockPorts?: string; unlockHull?: string; demand?: number };
 }
 
@@ -87,13 +116,24 @@ export const EVENTS = eventsJson as unknown as EventDef[];
 export const FIRST_DP = firstsJson as Record<string, number>;
 export const MILESTONES = milestonesJson as unknown as Record<string, MilestoneDef[]>;
 
+export const RIVAL_LINES = (rivalsJson as unknown as { lines: Record<string, { name: string; style: string }> }).lines;
+const rivalsOf = (id: string) => ((rivalsJson as unknown as Record<string, Rival[]>)[id] ?? []);
+
+function region(r: unknown, ports: unknown, lanes: { edges: unknown; canals: unknown }): Region {
+  const base = r as Omit<Region, 'ports' | 'edges' | 'canals' | 'rivals'>;
+  return {
+    ...base,
+    ports: ports as Record<string, Port>,
+    edges: lanes.edges as [string, string, EdgeOpts?][],
+    canals: lanes.canals as Region['canals'],
+    rivals: rivalsOf(base.id),
+  };
+}
+
 export const REGIONS: Record<string, Region> = {
-  northeast: {
-    ...(neRegion as unknown as Omit<Region, 'ports' | 'edges' | 'canals'>),
-    ports: nePorts as unknown as Record<string, Port>,
-    edges: neLanes.edges as unknown as [string, string, EdgeOpts?][],
-    canals: neLanes.canals as unknown as Region['canals'],
-  },
+  northeast: region(neRegion, nePorts, neLanes),
+  caribbean: region(caRegion, caPorts, caLanes),
 };
 
-export const HULL_ORDER = ['coastal', 'liner'];
+export const REGION_ORDER = ['northeast', 'caribbean'];
+export const HULL_ORDER = ['coastal', 'liner', 'mega'];

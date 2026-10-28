@@ -24,6 +24,11 @@ export function weekday(day: number): string {
   return WEEKDAYS[dateOf(day).getUTCDay()];
 }
 
+/** 0 = Sunday. */
+export function weekdayOf(day: number): number {
+  return dateOf(day).getUTCDay();
+}
+
 export function seasonOf(region: Region, day: number): SeasonDef | null {
   const m = dateOf(day).getUTCMonth() + 1;
   return region.seasons.find(s => s.months.includes(m)) ?? null;
@@ -31,6 +36,7 @@ export function seasonOf(region: Region, day: number): SeasonDef | null {
 
 /** Last day (inclusive) the region's season is open, for the season containing `day`. */
 export function seasonCloseDay(region: Region, day: number): number {
+  if (region.season.yearRound) return Infinity;
   const y = dateOf(day).getUTCFullYear();
   return dayOf(y, region.season.closeMonth + 1, 1) - 1;
 }

@@ -4,6 +4,10 @@ import type { Plan } from './planner';
 import type { ShipSpecs } from './ship';
 import { hashString, mulberry } from './geo';
 import { NO_TECH, type TechMods } from './tech';
+import { realHit, DANGER_NM } from './storms';
+
+export const CROWD_EVENT = 6000;
+export const STORM_REFUND = 40;
 import type { Vars } from './strings';
 
 export interface VoyageEvent {
@@ -49,8 +53,31 @@ export function rollEvents(plan: Plan, ship: ShipSpecs, booked: number, seed: nu
       out.push({ id: e.id, t: leg.dep + leg.sailH * 0.5, key, vars: { port: P[leg.to].name }, sat, cost: 0, good: sat > 0 });
     }
   }
+  // Storms: the real track can drift from the forecast. A port in its path closes; a leg near it is rough.
+  const day0 = plan.input.departDay;
+  for (const leg of plan.legs) {
+    const mid = leg.r.pts[Math.floor(leg.r.pts.length / 2)];
+    const hit = realHit(region, mid, day0 + (leg.dep + leg.sailH / 2) / 24);
+    if (hit && hit.nm < DANGER_NM * 1.3) {
+      const sat = Math.round(Math.min(-3, -8 * ship.galeK * (ship.gm < 1 ? 1.3 : 1)));
+      out.push({ id: 'stormSeas', t: leg.dep + leg.sailH * 0.5, key: 'event.stormSeas', vars: { storm: hit.storm.name }, sat, cost: 0, good: false });
+      break;
+    }
+  }
+  const closed = new Set<string>();
   for (const c of plan.calls) {
     const p = P[c.id];
+    const hit = realHit(region, [p.lon, p.lat], day0 + c.arr / 24);
+    if (hit) {
+      closed.add(c.id);
+      out.push({ id: 'stormClosed', t: c.arr, key: 'event.stormClosed', vars: { storm: hit.storm.name, port: p.name, refund: STORM_REFUND }, sat: -7, cost: booked * STORM_REFUND, good: false, cancelsCall: c.id });
+    } else if (c.crowd >= CROWD_EVENT) {
+      out.push({ id: 'crowded', t: c.arr + 2, key: 'event.crowded', vars: { port: p.name, n: c.crowd.toLocaleString('en-US') }, sat: -3, cost: 0, good: false });
+    }
+  }
+  for (const c of plan.calls) {
+    const p = P[c.id];
+    if (closed.has(c.id)) continue;
     for (const e of EVENTS.filter(x => x.on === 'call')) {
       if (e.port && e.port !== c.id) continue;
       if (e.season && e.season !== seasonId) continue;

@@ -31,8 +31,13 @@ export function chartSvg(region: Region): string {
     const pad = 0.25;
     if ([[0, 0], [pad, 0], [-pad, 0], [0, pad * 0.7], [0, -pad * 0.7]].some(([dx, dy]) => onLand(region, [lo + dx, la + dy]))) continue;
     const [x, y] = proj(lo, la);
-    const deep = la < 43.5 && lo > -69;
-    const v = deep ? Math.round(60 + r() * 1400) : Math.round(12 + r() * 90);
+    const snd = region.soundings ?? { shallow: [12, 90] as [number, number], deep: [60, 1400] as [number, number] };
+    const box = snd.deepBox;
+    // Without a deep-water box, water far from any coast reads deep.
+    const deep = box ? lo >= box[0] && la >= box[1] && lo <= box[2] && la <= box[3]
+      : ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => onLand(region, [lo + dx, la + dy]));
+    const [a0, a1] = deep ? snd.deep : snd.shallow;
+    const v = Math.round(a0 + r() * (a1 - a0));
     s += '<text x="' + x.toFixed(0) + '" y="' + y.toFixed(0) + '" class="sound">' + v + '</text>';
     n++;
   }
@@ -58,12 +63,15 @@ export function chartSvg(region: Region): string {
     s += '<line x1="' + (Math.sin(ra) * 44).toFixed(1) + '" y1="' + (-Math.cos(ra) * 44).toFixed(1) + '" x2="' + (Math.sin(ra) * (44 - L)).toFixed(1) + '" y2="' + (-Math.cos(ra) * (44 - L)).toFixed(1) + '" stroke-width=".8"/>';
   }
   s += '<path d="M0 -34 L6 0 L0 34 L-6 0 Z M-34 0 L0 -5 L34 0 L0 5 Z" fill="var(--sheet)" stroke-width="1"/><path d="M0 -34 L6 0 L-6 0 Z" fill="var(--accent)" stroke="none"/><text y="-50" text-anchor="middle" fill="var(--ink-2)" stroke="none" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600">N</text></g>';
-  // Scale bar: at this projection 1 px is about 1 nautical mile.
+  // Scale bar. One minute of latitude is one nautical mile, so px per nm is scale / 60.
   const [sx, sy] = proj(region.scaleBar.lon, region.scaleBar.lat);
-  s += '<g transform="translate(' + sx + ' ' + sy + ')" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)"><rect x="0" y="0" width="50" height="5" fill="var(--ink-2)"/><rect x="50" y="0" width="50" height="5" fill="var(--sheet)" stroke="var(--ink-2)"/><text x="0" y="17">0</text><text x="50" y="17" text-anchor="middle">50</text><text x="100" y="17" text-anchor="middle">100 nm</text></g>';
-  s += '<g id="routeLayer"></g><g id="portLayer"></g><g id="shipLayer"></g>';
+  const ppn = pxPerNm(region), step = ppn >= 0.8 ? 50 : 100, w = step * ppn;
+  s += '<g transform="translate(' + sx + ' ' + sy + ')" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)"><rect x="0" y="0" width="' + w + '" height="5" fill="var(--ink-2)"/><rect x="' + w + '" y="0" width="' + w + '" height="5" fill="var(--sheet)" stroke="var(--ink-2)"/><text x="0" y="17">0</text><text x="' + w + '" y="17" text-anchor="middle">' + step + '</text><text x="' + 2 * w + '" y="17" text-anchor="middle">' + 2 * step + ' nm</text></g>';
+  s += '<g id="stormLayer"></g><g id="routeLayer"></g><g id="portLayer"></g><g id="shipLayer"></g>';
   return '<svg id="map" viewBox="0 0 ' + MW.toFixed(0) + ' ' + MH.toFixed(0) + '" role="img" aria-label="' + esc(t('chart.aria', { region: region.name })) + '">' + s + '</svg>';
 }
+
+export const pxPerNm = (region: Region) => region.bounds.scale / 60;
 
 export function shipGlyph(x: number, y: number, ang: number): string {
   return '<g transform="translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') rotate(' + ang.toFixed(0) + ')"><path d="M-11 -4 L7 -4 L12 0 L7 4 L-11 4 Z" fill="var(--sheet)" stroke="var(--ink)" stroke-width="1.6"/><rect x="-6" y="-2" width="7" height="4" fill="var(--accent)"/></g>';

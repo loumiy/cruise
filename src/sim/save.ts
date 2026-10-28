@@ -12,7 +12,14 @@ export function serialise(state: GameState): string {
 }
 
 /** Upgrade code for old saves goes here, one step per version. */
-const MIGRATIONS: Record<number, (s: Record<string, unknown>) => Record<string, unknown>> = {};
+const MIGRATIONS: Record<number, (s: Record<string, unknown>) => Record<string, unknown>> = {
+  // v1 → v2: Chapter 2. Voyage logs record their region; one-time hints are tracked.
+  1: s => ({
+    ...s,
+    hints: (s.hints as string[] | undefined) ?? [],
+    log: ((s.log as Record<string, unknown>[] | undefined) ?? []).map(v => ({ region: 'northeast', ...v })),
+  }),
+};
 
 export function deserialise(text: string): GameState | null {
   let f: SaveFile;

@@ -1,0 +1,17 @@
+{
+  "lines": {
+    "azure": { "name": "Azure Wave", "style": "big and cheap" },
+    "tradewind": { "name": "Tradewind Line", "style": "plays the islands" },
+    "coral": { "name": "Coral Crown", "style": "chases premium guests" }
+  },
+  "caribbean": [
+    { "ship": "Azure Majesty", "line": "azure", "guests": 4200, "calls": { "1": "CZM", "2": "GCM", "3": "OCJ" } },
+    { "ship": "Azure Horizon", "line": "azure", "guests": 3800, "calls": { "1": "NAS", "3": "STT", "4": "SXM" } },
+    { "ship": "Azure Glory", "line": "azure", "guests": 4000, "calls": { "1": "RTB", "2": "CMA", "3": "CZM" } },
+    { "ship": "Azure Sun", "line": "azure", "guests": 3200, "calls": { "0": "NAS", "2": "EYW", "3": "OCJ" } },
+    { "ship": "Trade Spirit", "line": "tradewind", "guests": 1800, "calls": { "0": "STT", "1": "SXM", "2": "ANU", "3": "SLU", "4": "BGI" } },
+    { "ship": "Island Song", "line": "tradewind", "guests": 2000, "calls": { "1": "SLU", "2": "ANU", "3": "SXM", "4": "STT", "5": "SJU" } },
+    { "ship": "Sea Breeze", "line": "tradewind", "guests": 2600, "calls": { "2": "NAS", "4": "AMB", "5": "SJU" } },
+    { "ship": "Crown Jewel", "line": "coral", "guests": 900, "calls": { "1": "CUR", "2": "AUA", "4": "CTG", "5": "COL" } }
+  ]
+}

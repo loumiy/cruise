@@ -1,20 +1,20 @@
 // Chartroom: click ports on the chart to build a cruise, set the fare, then sail.
 import { t, tn } from '../sim/strings';
-import { MILESTONES } from '../sim/data';
+import { MILESTONES, REGIONS } from '../sim/data';
 import {
   draftPlan, planFinance, sail, shipById, specsOf, regionOf, normalisePlan, market, seasonOver, layUp, layUpCost,
-  firstDp, isSandbox, MAX_WAIT, type VoyageResult,
+  firstDp, isSandbox, MAX_WAIT, graduationOpen, crossingFor, graduate, type VoyageResult,
 } from '../sim/game';
-import { portStatus, turnarounds, NIGHT_OPTIONS, FUEL_RESERVE, type Plan, type PlanIssue } from '../sim/planner';
+import { stormsBetween, stormAt, coneNm, DANGER_NM } from '../sim/storms';
+import { portStatus, turnarounds, rivalsAt, NIGHT_OPTIONS, FUEL_RESERVE, type Plan, type PlanIssue } from '../sim/planner';
 import { fareCurve, summarise, FARE_MIN, FARE_MAX, FARE_STEP, type Finance } from '../sim/economy';
 import { fmtClock, fmtDate, seasonOf } from '../sim/calendar';
 import { projector } from '../sim/geo';
 import { $, esc, money, kmoney, ICON, issueRow, el } from './dom';
-import { chartSvg, ptsAttr, shipGlyph } from './chart';
+import { chartSvg, ptsAttr, shipGlyph, pxPerNm } from './chart';
 import { sound } from './audio';
 import type { App, Screen } from './app';
 
-const COUNTRY: Record<string, string> = { US: 'country.US', CA: 'country.CA', FR: 'country.FR' };
 
 export function issueText(i: PlanIssue): string {
   return t(i.key, i.vars);
@@ -29,7 +29,7 @@ export function chartroom(app: App): Screen {
 
   root.innerHTML =
     '<div class="cr-main"><div class="cr-left">' +
-    '<div class="mapcard" id="mapcard"><div class="maphead"><span class="label">' + esc(t('chart.head', { region: region.name })) + '</span><span class="sub2" id="mapStatus"></span></div>' +
+    '<div class="mapcard" id="mapcard"><div class="maphead"><span class="label">' + esc(t('chart.head', { region: region.name, nm: (1 / pxPerNm(region)).toFixed(1).replace(/\.0$/, '') })) + '</span><span class="sub2" id="mapStatus"></span></div>' +
     chartSvg(region) + '<div class="clock" id="clock" hidden></div><div class="tip" id="tip" hidden></div></div>' +
     '<div class="panel strip"><div class="maphead" style="padding:0 0 6px"><span class="label">' + esc(t('chart.strip')) + '</span><span class="sub2" id="stripMeta"></span></div>' +
     '<svg id="strip" viewBox="0 0 1000 150" role="img" aria-label="' + esc(t('chart.stripAria')) + '"></svg></div>' +
@@ -43,10 +43,13 @@ export function chartroom(app: App): Screen {
 
   function render() {
     if (sailing) return;
+    // The chart is drawn once per region. A new chapter means a new chart.
+    if (regionOf(app.state) !== region) { queueMicrotask(() => app.go('chartroom')); return; }
     normalisePlan(app.state);
     P = draftPlan(app.state);
     F = P ? planFinance(app.state, P) : null;
     renderPlanner();
+    renderStorms();
     renderRoute();
     renderPorts();
     renderStrip();
@@ -76,7 +79,7 @@ export function chartroom(app: App): Screen {
 
     h += '<div class="row2"><div><div class="label" style="margin-bottom:4px">' + esc(t('chart.nights')) + '</div><div class="seg" id="nights">' +
       NIGHT_OPTIONS.map(n => '<button type="button" data-nights="' + n + '" aria-pressed="' + (plan.nights === n) + '">' + n + '</button>').join('') + '</div></div>' +
-      '<div class="grow"><div class="label" style="margin-bottom:4px">' + esc(t('chart.depart')) + '</div><div class="seg days" id="wait">' +
+      '<div class="grow" data-tut="depart"><div class="label" style="margin-bottom:4px">' + esc(t('chart.depart')) + '</div><div class="seg days" id="wait">' +
       Array.from({ length: MAX_WAIT + 1 }, (_, w) => '<button type="button" data-wait="' + w + '" aria-pressed="' + (plan.wait === w) + '" title="' + esc(w ? tn('chart.waitDays', w) : t('chart.waitNone')) + '">' + esc(fmtDate(ship.day + w, false).replace(/ \w+$/, '')) + '</button>').join('') +
       '</div></div></div>';
     const season = seasonOf(region, ship.day + plan.wait);
@@ -100,7 +103,8 @@ export function chartroom(app: App): Screen {
       h += legLine(i);
       const c = P!.calls[i];
       h += '<div class="stop"><span class="n">' + (i + 1) + '</span><span><span class="nm">' + esc(region.ports[id].name) + '</span><br><span class="tm">' +
-        esc(c ? fmtClock(c.arr) + ' → ' + fmtClock(c.dep) + (c.refuel ? ' · ' + t('chart.refuel') : '') : t('chart.notReached')) + '</span></span>' +
+        esc(c ? t('weekday.' + c.weekday) + ' ' + fmtClock(c.arr) + ' → ' + fmtClock(c.dep) + (c.refuel ? ' · ' + t('chart.refuel') : '') +
+          (c.rivals.length ? ' · ' + tn('chart.rivalsHere', c.rivals.length) : '') + (c.tender ? ' · ' + t('chart.tendering') : '') : t('chart.notReached')) + '</span></span>' +
         '<span class="ctl"><button class="btn sm" data-up="' + i + '" type="button" aria-label="' + esc(t('chart.moveUp')) + '"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
         '<button class="btn sm" data-dn="' + i + '" type="button" aria-label="' + esc(t('chart.moveDown')) + '"' + (i === plan.stops.length - 1 ? ' disabled' : '') + '>↓</button>' +
         '<button class="btn sm" data-rm="' + i + '" type="button" aria-label="' + esc(t('chart.remove')) + '">×</button></span></div>';
@@ -310,12 +314,14 @@ export function chartroom(app: App): Screen {
     const card = $('#mapcard', root)!;
     let status = st.ok ? (id === ship.port && !s.plan.stops.length ? t('chart.tip.here') : t('chart.tip.add', { n: s.plan.stops.length + 1 })) : t(st.key, st.vars);
     if (st.ok && s.plan.stops.includes(id)) status = t('chart.tip.again');
-    tip.innerHTML = '<h4>' + esc(p.name) + '</h4><div class="sub2">' + esc(t(COUNTRY[p.country])) + (p.turnaround ? ' · ' + esc(t('chart.tip.turnaround')) : '') + '</div>' +
+    tip.innerHTML = '<h4>' + esc(p.name) + '</h4><div class="sub2">' + esc(t('country.' + p.country)) + (p.turnaround ? ' · ' + esc(t('chart.tip.turnaround')) : '') + '</div>' +
       '<div class="tags">' + p.tags.map(x => '<span class="tag">' + esc(x) + '</span>').join('') + '</div>' +
       '<div class="row"><span>' + esc(t('chart.tip.appeal')) + '</span><span class="mono">' + p.appeal[0] + ' / ' + p.appeal[1] + '</span></div>' +
       '<div class="row"><span>' + esc(t('chart.tip.berth')) + '</span><span class="mono">' + esc(p.berth === 'tender' ? t('chart.tip.tender') : t('chart.tip.pier', { draft: p.maxDraft ?? '—', len: p.maxLength ?? '—' })) + '</span></div>' +
       '<div class="row"><span>' + esc(t('chart.tip.fuel')) + '</span><span class="mono">' + esc(p.fuel ? t('chart.tip.fuelYes') : t('chart.tip.fuelNo')) + '</span></div>' +
       '<div class="row"><span>' + esc(t('chart.tip.fees')) + '</span><span class="mono">$' + p.callFee.toLocaleString('en-US') + ' + $' + p.headTax + '/' + esc(t('chart.tip.guest')) + '</span></div>' +
+      (p.berths != null && !p.privateIsland ? '<div class="row"><span>' + esc(t('chart.tip.piers')) + '</span><span class="mono">' + p.berths + (p.tenderOk ? ' + ' + esc(t('chart.tip.anchor')) : '') + '</span></div>' + rivalWeek(id) : '') +
+      (p.spend ? '<div class="row"><span>' + esc(t('chart.tip.island')) + '</span><span class="mono">+$' + p.spend + '/' + esc(t('chart.tip.guest')) + '</span></div>' : '') +
       '<div class="st ' + (st.ok ? 'ok' : 'bad') + '">' + (st.ok ? ICON.ok : ICON.err) + ' ' + esc(status) + '</div>';
     tip.hidden = false;
     const svgR = $('#map', root)!.getBoundingClientRect(), cR = card.getBoundingClientRect();
@@ -332,6 +338,83 @@ export function chartroom(app: App): Screen {
     tip.style.top = Math.max(6, top) + 'px';
   }
   function hideTip() { tip.hidden = true; }
+
+  /** Which weekdays rivals call here: "Mon 1 · Tue 2 (full)". */
+  function rivalWeek(id: string): string {
+    const p = region.ports[id];
+    const days = [0, 1, 2, 3, 4, 5, 6].map(d => ({ d, n: rivalsAt(region, id, d).length })).filter(x => x.n);
+    if (!days.length) return '';
+    return '<div class="row"><span>' + esc(t('chart.tip.rivals')) + '</span><span class="mono">' +
+      days.map(x => esc(t('weekday.' + x.d)) + ' ' + x.n + (p.berths != null && x.n >= p.berths ? ' ' + ICON.err : '')).join(' · ') + '</span></div>';
+  }
+
+  // ---------- storms ----------
+  function renderStorms() {
+    const g = $('#stormLayer', root)!;
+    const s = app.state, ship = shipById(s, s.plan.shipId)!;
+    const d0 = ship.day + s.plan.wait, d1 = d0 + s.plan.nights;
+    const ppn = pxPerNm(region);
+    let h = '';
+    for (const st of stormsBetween(region, d0, d1)) {
+      // The forecast cone: the danger zone along the forecast track, widening with each day ahead.
+      const pts: [number, number, number][] = [];
+      for (let d = Math.max(d0, st.t0); d <= d1 + 0.01; d += 1) {
+        const c = stormAt(st, d, false);
+        if (c) pts.push([...proj(c[0], c[1]), (DANGER_NM + coneNm(d - d0)) * ppn] as [number, number, number]);
+      }
+      if (!pts.length) continue;
+      h += pts.map(([x, y, r]) => '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r.toFixed(1) + '" fill="var(--err)" opacity=".04"/>').join('');
+      const last = pts[pts.length - 1];
+      h += '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="' + last[2].toFixed(1) + '" fill="none" stroke="var(--err)" stroke-width="1" stroke-dasharray="3 5" opacity=".6"/>';
+      h += '<polyline points="' + pts.map(([x, y]) => x.toFixed(1) + ',' + y.toFixed(1)).join(' ') + '" fill="none" stroke="var(--err)" stroke-width="1.5" stroke-dasharray="4 4"/>';
+      const [x, y] = pts[0];
+      const spin = app.reduced() ? '' : '<animateTransform attributeName="transform" type="rotate" from="0" to="-360" dur="6s" repeatCount="indefinite"/>';
+      h += '<g transform="translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')"><g>' + spin +
+        '<path d="M0 -9 C7 -9 9 -3 4 0 M0 9 C-7 9 -9 3 -4 0" fill="none" stroke="var(--err)" stroke-width="2.5" stroke-linecap="round"/><circle r="3" fill="var(--err)"/></g>' +
+        '<text x="12" y="-8" class="canal-lbl" style="fill:var(--err)">' + esc(t('chart.storm', { name: st.name })) + '</text></g>';
+    }
+    g.innerHTML = h;
+  }
+
+  // ---------- graduation ----------
+  function openCrossing() {
+    const s = app.state, g = region.graduation!;
+    const to = g.toRegion!;
+    const body = el('<div class="body" style="padding:0"></div>');
+    const chosen = new Set<string>();
+    const draw = () => {
+      let h = '<p class="hint">' + esc(t('cross.intro', { port: region.ports[g.toPort!]?.name ?? 'Miami' })) + '</p><div class="ships">';
+      for (const sh of s.ships) {
+        const c = crossingFor(s, sh);
+        const can = c.ok;
+        h += '<label class="ship" style="cursor:' + (can ? 'pointer' : 'not-allowed') + '"><span><input type="checkbox" data-ship="' + sh.id + '"' + (can ? '' : ' disabled') + (chosen.has(sh.id) ? ' checked' : '') + '> <span class="nm">' + esc(sh.name) + '</span></span>' +
+          '<span class="loc">' + esc(region.ports[sh.port].name) + '</span><span class="specs">' +
+          (c.nm ? esc(t('cross.stats', { nm: c.nm, days: (c.hours / 24).toFixed(1), fuel: Math.round(Math.max(0, c.fuelLeft) * 100), heel: Math.round(c.heel) })) : '') + '</span>' +
+          '<span style="grid-column:1/-1">' + (c.issues.length ? c.issues.map(i => '<span class="' + (i.lvl === 'err' ? 'bad' : 'warned') + '">' + ICON[i.lvl] + ' ' + esc(t(i.key, i.vars)) + '</span>').join('<br>') : '<span class="good">' + ICON.ok + ' ' + esc(t('cross.ready')) + '</span>') + '</span></label>';
+      }
+      h += '</div><div class="ledger"><span class="label hd">' + esc(t('cross.carry')) + '</span>' +
+        '<span>' + esc(t('cross.keep')) + '</span><span></span>' +
+        '<span>' + esc(t('cross.cash', { pct: Math.round((g.keepCash ?? 0.25) * 100) })) + '</span><span class="mono">' + money(Math.round(s.cash * (g.keepCash ?? 0.25)) + (g.grant ?? 0)) + '</span>' +
+        '<span>' + esc(t('cross.rep')) + '</span><span class="mono">' + s.rep.toFixed(1) + ' → ' + (Math.round((s.rep + 3) / 2 * 10) / 10).toFixed(1) + '</span>' +
+        '<span>' + esc(t('cross.left')) + '</span><span></span></div>';
+      body.innerHTML = h;
+      body.querySelectorAll<HTMLInputElement>('[data-ship]').forEach(cb => cb.onchange = () => { if (cb.checked) chosen.add(cb.dataset.ship!); else chosen.delete(cb.dataset.ship!); draw(); });
+    };
+    draw();
+    app.modal({
+      title: t('cross.title', { to: t('region.' + to) }), wide: true, body, buttons: [{ label: t('ui.cancel') }, {
+        label: t('cross.go'), primary: true, action: () => {
+          if (!chosen.size) { app.toast(t('cross.pickShip')); return false; }
+          const r = graduate(s, [...chosen]);
+          if ('ok' in r) { if (!r.ok) app.toast(t(r.key, r.vars)); return false; }
+          sound.horn(app.settings);
+          app.go('chartroom');
+          app.commit();
+          app.chapterIntro(r);
+        },
+      }],
+    });
+  }
 
   // ---------- schedule strip ----------
   function renderStrip(plan: Plan | null = P) {
@@ -373,7 +456,16 @@ export function chartroom(app: App): Screen {
       const done = s.milestones.includes(m.id);
       return '<div class="m' + (done ? ' done' : '') + '"><span class="box" aria-label="' + esc(done ? t('ui.done') : t('ui.open')) + '">' + (done ? '✓' : '') + '</span>' +
         '<span><b>' + esc(t('milestone.' + m.id + '.name')) + '</b><br><span class="ds">' + esc(t('milestone.' + m.id + '.goal')) + '</span></span><span class="rw">' + esc(t('milestone.' + m.id + '.reward')) + '</span></div>';
-    }).join('') + '<div class="m"><span class="box">·</span><span><b>' + esc(t('chart.graduation')) + '</b><br><span class="ds">' + esc(t('chart.graduationGoal')) + '</span></span><span class="rw">' + esc(t('chart.comingSoon')) + '</span></div>';
+    }).join('') + graduationRow();
+    $('#milestones', root)!.querySelector<HTMLButtonElement>('[data-cross]')?.addEventListener('click', openCrossing);
+  }
+
+  function graduationRow(): string {
+    const g = region.graduation;
+    if (!g) return '';
+    const open = graduationOpen(app.state);
+    return '<div class="m"><span class="box">·</span><span><b>' + esc(t('milestone.' + g.id + '.name')) + '</b><br><span class="ds">' + esc(t('milestone.' + g.id + '.goal')) + '</span></span>' +
+      '<span class="rw">' + (g.locked ? esc(t('chart.comingSoon')) : open ? '<button type="button" class="btn sm primary" data-cross data-tut="cross">' + esc(t('cross.plan')) + '</button>' : esc(t('milestone.' + g.id + '.reward'))) + '</span></div>';
   }
 
   function renderLog() {
@@ -383,7 +475,7 @@ export function chartroom(app: App): Screen {
       box.innerHTML = sailing.shown.map(e => '<div class="e"><span class="mono sub2">' + esc(fmtClock(e.t)) + '</span><span class="' + (e.good ? 'good' : 'bad') + '">' + (e.good ? ICON.ok : ICON.warn) + ' ' + esc(t(e.key, e.vars)) + '</span><span></span></div>').join('') || '<p class="hint">' + esc(t('chart.underway')) + '</p>';
       return;
     }
-    box.innerHTML = s.log.length ? s.log.slice().reverse().map(v => '<div class="e"><span class="mono sub2">#' + v.n + '</span><span>' + esc(v.route.map(id => region.ports[id]?.name ?? id).join(' → ')) + ' · ' + esc(v.ship) + ' · ' + esc(t('chart.satShort', { n: v.sat })) + '</span><span class="mono ' + (v.profit >= 0 ? 'good' : 'bad') + '">' + kmoney(v.profit) + '</span></div>').join('')
+    box.innerHTML = s.log.length ? s.log.slice().reverse().map(v => '<div class="e"><span class="mono sub2">#' + v.n + '</span><span>' + esc(v.route.map(id => (REGIONS[v.region] ?? region).ports[id]?.name ?? id).join(' → ')) + ' · ' + esc(v.ship) + ' · ' + esc(t('chart.satShort', { n: v.sat })) + '</span><span class="mono ' + (v.profit >= 0 ? 'good' : 'bad') + '">' + kmoney(v.profit) + '</span></div>').join('')
       : '<p class="hint">' + esc(t('chart.noVoyages')) + '</p>';
   }
 

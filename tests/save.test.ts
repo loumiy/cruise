@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { newGame, sail } from '../src/sim/game';
+import { newGame, sail, SAVE_VERSION } from '../src/sim/game';
 import { serialise, deserialise, writeSave, readSave, type Store } from '../src/sim/save';
 import { encodeBlueprint, decodeBlueprint } from '../src/sim/share';
 import { designHash } from '../src/sim/ship';
@@ -18,7 +18,7 @@ describe('saves', () => {
     s.plan.fare = 260;
     sail(s);
     const txt = serialise(s);
-    expect(JSON.parse(txt).version).toBe(1);
+    expect(JSON.parse(txt).version).toBe(SAVE_VERSION);
     expect(deserialise(txt)).toEqual(s);
   });
   it('writes and reads slots', () => {
@@ -36,8 +36,21 @@ describe('saves', () => {
   it('fills fields a newer build added', () => {
     const s = newGame() as unknown as Record<string, unknown>;
     delete s.demandBonus;
-    const back = deserialise(JSON.stringify({ game: 'cruise-line-manager', version: 1, savedAt: '', state: s }))!;
+    const back = deserialise(JSON.stringify({ game: 'cruise-line-manager', version: SAVE_VERSION, savedAt: '', state: s }))!;
     expect(back.demandBonus).toBe(0);
+  });
+  it('upgrades a version 1 save', () => {
+    const g = newGame();
+    g.plan.stops = ['BHB', 'HFX'];
+    sail(g);
+    const old = JSON.parse(JSON.stringify(g));
+    delete old.hints;
+    for (const v of old.log) delete v.region;
+    old.version = 1;
+    const back = deserialise(JSON.stringify({ game: 'cruise-line-manager', version: 1, savedAt: '', state: old }))!;
+    expect(back.version).toBe(SAVE_VERSION);
+    expect(back.hints).toEqual([]);
+    expect(back.log[0].region).toBe('northeast');
   });
 });
 

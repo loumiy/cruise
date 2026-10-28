@@ -1,6 +1,6 @@
 // The guided first cruise. One sentence and one action per step. Skippable at any step.
 import { t } from '../sim/strings';
-import { draftPlan, planFinance, report, trialStatus } from '../sim/game';
+import { draftPlan, planFinance, report, trialStatus, graduationOpen, regionOf, canLeaseIsland } from '../sim/game';
 import { $$, esc } from './dom';
 import type { App, ScreenId } from './app';
 
@@ -52,6 +52,21 @@ export const STEPS: Step[] = [
   { id: 'sailNew', screen: 'chartroom', target: '[data-tut="ships"]', done: a => a.state.voyages > 1 },
 ];
 
+/** One-time prompts: each new mechanic gets one the first time it matters, then never again. */
+interface Hint { id: string; screen?: ScreenId; target?: string; when(app: App): boolean }
+const planHas = (a: App, prefix: string) => !!draftPlan(a.state)?.issues.some(i => i.key.startsWith(prefix));
+
+export const HINTS: Hint[] = [
+  { id: 'fuelLow', screen: 'chartroom', when: a => planHas(a, 'plan.fuel') },
+  { id: 'late', screen: 'chartroom', when: a => planHas(a, 'plan.late') },
+  { id: 'graduate', screen: 'chartroom', target: '[data-tut="cross"]', when: a => graduationOpen(a.state) && a.state.region === 'northeast' },
+  { id: 'aircon', screen: 'chartroom', when: a => (regionOf(a.state).hotelMult ?? 1) > 1 },
+  { id: 'piers', screen: 'chartroom', target: '[data-tut="depart"]', when: a => planHas(a, 'plan.piersFull') },
+  { id: 'crowd', screen: 'chartroom', when: a => planHas(a, 'plan.crowd') },
+  { id: 'storm', screen: 'chartroom', when: a => planHas(a, 'plan.storm') },
+  { id: 'island', screen: 'chartroom', target: '[data-tut="nav-company"]', when: a => canLeaseIsland(a.state).ok },
+];
+
 export class Tutorial {
   private app: App;
   private entered = -1;
@@ -85,13 +100,27 @@ export class Tutorial {
     this.app.commit();
   }
 
+  private hint(): Hint | null {
+    const st = this.app.state;
+    if (this.active || st.mode === 'sandbox') return null;
+    return HINTS.find(h => !st.hints.includes(h.id) && (!h.screen || h.screen === this.app.screen) && h.when(this.app)) ?? null;
+  }
+
   render() {
     this.check();
     const bar = document.getElementById('tutbar');
     $$('.tut-target').forEach(n => n.classList.remove('tut-target'));
     if (!bar) return;
     const s = this.step();
-    if (!s) { bar.hidden = true; return; }
+    if (!s) {
+      const h = this.hint();
+      if (!h) { bar.hidden = true; return; }
+      bar.hidden = false;
+      bar.innerHTML = '<div class="row"><span class="step">' + esc(t('hint.label')) + '</span><span class="msg">' + esc(t('hint.' + h.id)) + '</span><button type="button" class="btn sm" data-gotit>' + esc(t('hint.gotIt')) + '</button></div>';
+      bar.querySelector<HTMLButtonElement>('[data-gotit]')!.onclick = () => { this.app.state.hints.push(h.id); this.app.commit({ render: false }); };
+      if (h.target) $$(h.target).forEach(n => n.classList.add('tut-target'));
+      return;
+    }
     bar.hidden = false;
     const here = this.app.screen === s.screen;
     // When the step lives on another screen, point at its tab instead.

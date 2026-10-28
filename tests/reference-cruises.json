@@ -54,5 +54,37 @@
     "booked": 294,
     "fuel": 22,
     "profit": 256682
+  },
+  "liner · Bahamas + Coral Cay · 3n": {
+    "errors": [],
+    "appeal": 45,
+    "fare": 165,
+    "booked": 902,
+    "fuel": 41,
+    "profit": 268986
+  },
+  "liner · Eastern Caribbean from Barbados · 6n": {
+    "errors": [],
+    "appeal": 64,
+    "fare": 170,
+    "booked": 902,
+    "fuel": 110,
+    "profit": 421414
+  },
+  "mega · Western Caribbean · 7n": {
+    "errors": [],
+    "appeal": 59,
+    "fare": 145,
+    "booked": 2212,
+    "fuel": 507,
+    "profit": 361353
+  },
+  "mega · Eastern Caribbean from San Juan · 7n": {
+    "errors": [],
+    "appeal": 77,
+    "fare": 150,
+    "booked": 2212,
+    "fuel": 306,
+    "profit": 499628
   }
 }

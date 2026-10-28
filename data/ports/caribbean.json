@@ -1,0 +1,539 @@
+{
+ "MIA": {
+  "name": "Miami",
+  "country": "US",
+  "lon": -80.15,
+  "lat": 25.77,
+  "appeal": [
+   7,
+   7
+  ],
+  "tags": [
+   "big city",
+   "nightlife"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 370,
+  "fuel": true,
+  "turnaround": true,
+  "callFee": 2500,
+  "headTax": 30,
+  "berths": 8,
+  "label": [
+   -9,
+   4,
+   "end"
+  ]
+ },
+ "EYW": {
+  "name": "Key West",
+  "country": "US",
+  "lon": -81.8,
+  "lat": 24.56,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "Hemingway",
+   "sunsets"
+  ],
+  "berth": "pier",
+  "maxDraft": 9,
+  "maxLength": 300,
+  "callFee": 1800,
+  "headTax": 22,
+  "berths": 2,
+  "label": [
+   -6,
+   16,
+   "middle"
+  ]
+ },
+ "NAS": {
+  "name": "Nassau",
+  "country": "BS",
+  "lon": -77.35,
+  "lat": 25.08,
+  "appeal": [
+   7,
+   7
+  ],
+  "tags": [
+   "beaches",
+   "straw market"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 370,
+  "callFee": 2000,
+  "headTax": 24,
+  "berths": 6,
+  "tenderOk": true,
+  "label": [
+   8,
+   14,
+   "start"
+  ]
+ },
+ "CORAL": {
+  "name": "Coral Cay",
+  "country": "BS",
+  "lon": -77.79,
+  "lat": 25.8,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "private beach"
+  ],
+  "berth": "tender",
+  "callFee": 0,
+  "headTax": 0,
+  "tenderFee": 2500,
+  "berths": 99,
+  "lockedBy": "island",
+  "privateIsland": true,
+  "spend": 70,
+  "label": [
+   0,
+   -10,
+   "middle"
+  ]
+ },
+ "HAV": {
+  "name": "Havana",
+  "country": "CU",
+  "lon": -82.36,
+  "lat": 23.15,
+  "appeal": [
+   10,
+   10
+  ],
+  "tags": [
+   "old city",
+   "music"
+  ],
+  "berth": "pier",
+  "callFee": 0,
+  "headTax": 0,
+  "closed": true,
+  "berths": 0,
+  "label": [
+   0,
+   -9,
+   "middle"
+  ]
+ },
+ "CZM": {
+  "name": "Cozumel",
+  "country": "MX",
+  "lon": -86.78,
+  "lat": 20.45,
+  "appeal": [
+   9,
+   9
+  ],
+  "tags": [
+   "reef snorkel",
+   "Mayan ruins"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 360,
+  "callFee": 2200,
+  "headTax": 18,
+  "berths": 6,
+  "tenderOk": true,
+  "label": [
+   8,
+   4,
+   "start"
+  ]
+ },
+ "CMA": {
+  "name": "Costa Maya",
+  "country": "MX",
+  "lon": -87.68,
+  "lat": 18.72,
+  "appeal": [
+   6,
+   6
+  ],
+  "tags": [
+   "Mayan ruins"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 340,
+  "callFee": 1800,
+  "headTax": 14,
+  "berths": 3,
+  "label": [
+   -9,
+   4,
+   "end"
+  ]
+ },
+ "RTB": {
+  "name": "Roatán",
+  "country": "HN",
+  "lon": -86.42,
+  "lat": 16.46,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "reef snorkel",
+   "zip lines"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 340,
+  "callFee": 1800,
+  "headTax": 15,
+  "berths": 3,
+  "label": [
+   0,
+   -9,
+   "middle"
+  ]
+ },
+ "GCM": {
+  "name": "Grand Cayman",
+  "country": "KY",
+  "lon": -81.25,
+  "lat": 19.28,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "stingrays",
+   "reef snorkel"
+  ],
+  "berth": "tender",
+  "callFee": 2200,
+  "headTax": 25,
+  "tenderFee": 3000,
+  "berths": 6,
+  "label": [
+   0,
+   16,
+   "middle"
+  ]
+ },
+ "OCJ": {
+  "name": "Ocho Rios",
+  "country": "JM",
+  "lon": -77.1,
+  "lat": 18.47,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "waterfalls",
+   "reggae"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 320,
+  "callFee": 1800,
+  "headTax": 15,
+  "berths": 2,
+  "tenderOk": true,
+  "label": [
+   0,
+   -9,
+   "middle"
+  ]
+ },
+ "AMB": {
+  "name": "Amber Cove",
+  "country": "DO",
+  "lon": -70.75,
+  "lat": 19.84,
+  "appeal": [
+   6,
+   6
+  ],
+  "tags": [
+   "beaches",
+   "zip lines"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 340,
+  "callFee": 1700,
+  "headTax": 12,
+  "berths": 2,
+  "label": [
+   0,
+   -9,
+   "middle"
+  ]
+ },
+ "SJU": {
+  "name": "San Juan",
+  "country": "US",
+  "lon": -66.11,
+  "lat": 18.48,
+  "appeal": [
+   9,
+   9
+  ],
+  "tags": [
+   "old city",
+   "forts"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 340,
+  "fuel": true,
+  "turnaround": true,
+  "callFee": 2400,
+  "headTax": 26,
+  "berths": 4,
+  "label": [
+   -8,
+   -6,
+   "end"
+  ]
+ },
+ "STT": {
+  "name": "St. Thomas",
+  "country": "US",
+  "lon": -64.93,
+  "lat": 18.38,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "duty-free",
+   "beaches"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 340,
+  "callFee": 2000,
+  "headTax": 22,
+  "berths": 4,
+  "tenderOk": true,
+  "label": [
+   6,
+   14,
+   "start"
+  ]
+ },
+ "SXM": {
+  "name": "St. Maarten",
+  "country": "SX",
+  "lon": -63.05,
+  "lat": 18.07,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "duty-free",
+   "beaches"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 370,
+  "callFee": 2000,
+  "headTax": 18,
+  "berths": 6,
+  "label": [
+   8,
+   -6,
+   "start"
+  ]
+ },
+ "ANU": {
+  "name": "Antigua",
+  "country": "AG",
+  "lon": -61.85,
+  "lat": 17.16,
+  "appeal": [
+   7,
+   7
+  ],
+  "tags": [
+   "365 beaches",
+   "sailing"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 340,
+  "callFee": 1800,
+  "headTax": 16,
+  "berths": 4,
+  "label": [
+   -8,
+   -6,
+   "end"
+  ]
+ },
+ "SLU": {
+  "name": "St. Lucia",
+  "country": "LC",
+  "lon": -60.89,
+  "lat": 14.05,
+  "appeal": [
+   9,
+   9
+  ],
+  "tags": [
+   "Pitons",
+   "rainforest"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 320,
+  "callFee": 1800,
+  "headTax": 16,
+  "berths": 2,
+  "tenderOk": true,
+  "label": [
+   8,
+   4,
+   "start"
+  ]
+ },
+ "BGI": {
+  "name": "Barbados",
+  "country": "BB",
+  "lon": -59.64,
+  "lat": 13.12,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "beaches",
+   "rum"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 340,
+  "fuel": true,
+  "turnaround": true,
+  "callFee": 2200,
+  "headTax": 20,
+  "berths": 4,
+  "label": [
+   -8,
+   16,
+   "end"
+  ]
+ },
+ "AUA": {
+  "name": "Aruba",
+  "country": "AW",
+  "lon": -69.97,
+  "lat": 12.53,
+  "appeal": [
+   7,
+   7
+  ],
+  "tags": [
+   "beaches",
+   "casinos"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 340,
+  "fuel": true,
+  "callFee": 1900,
+  "headTax": 18,
+  "berths": 4,
+  "label": [
+   0,
+   -9,
+   "middle"
+  ]
+ },
+ "CUR": {
+  "name": "Curaçao",
+  "country": "CW",
+  "lon": -68.95,
+  "lat": 12.22,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "old city",
+   "reef snorkel"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 340,
+  "fuel": true,
+  "callFee": 1900,
+  "headTax": 18,
+  "berths": 3,
+  "label": [
+   8,
+   12,
+   "start"
+  ]
+ },
+ "CTG": {
+  "name": "Cartagena",
+  "country": "CO",
+  "lon": -75.55,
+  "lat": 10.42,
+  "appeal": [
+   9,
+   9
+  ],
+  "tags": [
+   "old city",
+   "history"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 340,
+  "callFee": 2000,
+  "headTax": 18,
+  "berths": 3,
+  "label": [
+   8,
+   4,
+   "start"
+  ]
+ },
+ "COL": {
+  "name": "Colón",
+  "country": "PA",
+  "lon": -79.9,
+  "lat": 9.37,
+  "appeal": [
+   9,
+   9
+  ],
+  "tags": [
+   "Panama Canal"
+  ],
+  "berth": "pier",
+  "maxDraft": 12,
+  "maxLength": 294,
+  "maxBeam": 32.3,
+  "callFee": 2500,
+  "headTax": 20,
+  "berths": 3,
+  "canalCall": 30000,
+  "label": [
+   0,
+   16,
+   "middle"
+  ]
+ }
+}

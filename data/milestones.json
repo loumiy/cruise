@@ -1,9 +1,106 @@
 {
-  "northeast": [
-    { "id": "maiden", "test": { "voyages": 1 }, "reward": { "cash": 50000, "unlock": "drydock" } },
-    { "id": "stl", "test": { "visit": "YQB" }, "reward": { "cash": 75000 } },
-    { "id": "six", "test": { "profit": 100000 }, "reward": { "unlockPorts": "six" } },
-    { "id": "capital", "test": { "cash": 750000 }, "reward": { "unlockHull": "liner" } },
-    { "id": "stars", "test": { "rep": 4.5 }, "reward": { "demand": 0.1 } }
-  ]
+ "northeast": [
+  {
+   "id": "maiden",
+   "test": {
+    "voyages": 1
+   },
+   "reward": {
+    "cash": 50000,
+    "unlock": "drydock"
+   }
+  },
+  {
+   "id": "stl",
+   "test": {
+    "visit": "YQB"
+   },
+   "reward": {
+    "cash": 75000
+   }
+  },
+  {
+   "id": "six",
+   "test": {
+    "profit": 100000
+   },
+   "reward": {
+    "unlockPorts": "six"
+   }
+  },
+  {
+   "id": "capital",
+   "test": {
+    "cash": 750000
+   },
+   "reward": {
+    "unlockHull": "liner"
+   }
+  },
+  {
+   "id": "stars",
+   "test": {
+    "rep": 4.5
+   },
+   "reward": {
+    "demand": 0.1
+   }
+  }
+ ],
+ "caribbean": [
+  {
+   "id": "sun",
+   "test": {
+    "regionVoyages": 1
+   },
+   "reward": {
+    "cash": 100000
+   }
+  },
+  {
+   "id": "fullhouse",
+   "test": {
+    "soldOutPax": 800
+   },
+   "reward": {
+    "cash": 150000
+   }
+  },
+  {
+   "id": "islandOwner",
+   "test": {
+    "island": true
+   },
+   "reward": {
+    "demand": 0.05
+   }
+  },
+  {
+   "id": "weather",
+   "test": {
+    "stormProfits": 4
+   },
+   "reward": {
+    "cash": 250000
+   }
+  },
+  {
+   "id": "megaMarket",
+   "test": {
+    "weekGuests": 1500
+   },
+   "reward": {
+    "unlockHull": "mega"
+   }
+  },
+  {
+   "id": "favorite",
+   "test": {
+    "rep": 4.5
+   },
+   "reward": {
+    "demand": 0.1
+   }
+  }
+ ]
 }

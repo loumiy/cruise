@@ -299,6 +299,7 @@ textarea.code { width: 100%; min-height: 5rem; font-family: var(--f-mono); font-
 .fleet td.num { font-family: var(--f-mono); text-align: right; }
 .tree { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; }
 .branch { display: flex; flex-direction: column; gap: .4rem; }
+.island { display: flex; gap: .6rem 1rem; align-items: center; flex-wrap: wrap; }
 .tnode { border: 1.5px solid var(--rule); padding: .4rem .5rem; text-align: left; background: transparent; display: flex; flex-direction: column; gap: 2px; font-size: .8rem; min-height: 5.4rem; }
 .tnode b { font-size: .86rem; }
 .tnode .cost { font-family: var(--f-mono); font-size: .7rem; color: var(--ink-2); }
@@ -350,3 +351,8 @@ textarea.code { width: 100%; min-height: 5rem; font-family: var(--f-mono); font-
 }
 :root[data-motion="reduce"] .blk.flash .in { animation: none; outline: 3px solid var(--accent); }
 :root[data-motion="reduce"] .tut-target { animation: none; }
+
+/* Region tints. Caribbean shallows run turquoise. */
+:root[data-tint="tropic"] { --shoal: #b9e6e1; --water: #f3fbfb; --land: #efe2bf; }
+@media (prefers-color-scheme: dark) { :root[data-tint="tropic"]:not([data-theme="light"]) { --shoal: #12423f; --water: #0c1d22; } }
+:root[data-tint="tropic"][data-theme="dark"] { --shoal: #12423f; --water: #0c1d22; }

@@ -9,9 +9,10 @@ import { fairFare, finance, summarise, type Finance, type Market } from './econo
 import { planSeed, rollEvents, type VoyageEvent } from './events';
 import { canBuy, dpSpent, techMods, type TechMods } from './tech';
 import { nextOpenDay, seasonCloseDay, seasonOf } from './calendar';
+import { checkCrossing, type CrossingCheck } from './crossing';
 import type { Vars } from './strings';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 export const SANDBOX_CASH = 999_999_999;
 export const START_CASH = 300_000;
 export const START_REP = 3.0;
@@ -19,6 +20,9 @@ export const BUILD_DAYS = 7;
 export const REFIT_DAYS = 4;
 export const LAYUP_NIGHTS = 10;
 export const MAX_WAIT = 6;
+export const ISLAND_LEASE = 1_500_000;
+/** Bookings at or above this count as "booked full" for milestones. */
+export const FULL_OCC = 0.95;
 
 export interface Blueprint {
   id: string; name: string; design: Design;
@@ -29,7 +33,7 @@ export interface ShipRec {
   port: string; day: number; voyages: number; chartered?: boolean;
 }
 export interface LogEntry {
-  n: number; day: number; shipId: string; ship: string; route: string[]; nights: number;
+  n: number; day: number; region: string; season?: string; shipId: string; ship: string; route: string[]; nights: number;
   booked: number; pax: number; fare: number; profit: number; sat: number;
   events: { key: string; vars: Vars; good: boolean }[];
 }
@@ -47,6 +51,8 @@ export interface GameState {
   blueprints: Blueprint[]; ships: ShipRec[]; log: LogEntry[]; voyages: number;
   plan: PlanDraft;
   tutorial: { step: number; off: boolean };
+  /** One-time prompts already shown for new mechanics. */
+  hints: string[];
   seq: number;
 }
 
@@ -59,7 +65,7 @@ export function placedFrom(raw: StarterBlock[], prefix = 'b'): Placed[] {
   });
 }
 
-type StarterKey = 'puffin' | 'harbor' | 'crown';
+type StarterKey = 'puffin' | 'harbor' | 'crown' | 'majesty';
 const STARTERS = starters as unknown as Record<StarterKey, { name: string; hull: string; blocks: StarterBlock[] }>;
 
 function starter(key: StarterKey): Design {
@@ -68,7 +74,7 @@ function starter(key: StarterKey): Design {
 }
 
 /** A hull unlock comes with a template design to start from. */
-const HULL_TEMPLATE: Record<string, StarterKey> = { liner: 'crown' };
+const HULL_TEMPLATE: Record<string, StarterKey> = { liner: 'crown', mega: 'majesty' };
 
 function addTemplate(s: GameState, hull: string): void {
   const key = HULL_TEMPLATE[hull];
@@ -97,6 +103,7 @@ export function newGame(mode: 'campaign' | 'sandbox' = 'campaign'): GameState {
     log: [], voyages: 0,
     plan: { shipId: 's1', nights: 4, wait: 0, stops: [], end: 'BOS', fare: 400 },
     tutorial: { step: 0, off: sandbox },
+    hints: [],
     seq: 10,
   };
   // The Puffin's trial is on file, so it can be copied and refit straight away.
@@ -297,7 +304,7 @@ export function sail(s: GameState): VoyageResult | null {
   const visited = plan.calls.map(c => c.id).filter(id => !cancelled.has(id));
   const region = regionOf(s);
   s.log.push({
-    n: s.voyages, day: plan.input.departDay, shipId: ship.id, ship: ship.name,
+    n: s.voyages, day: plan.input.departDay, region: region.id, season: plan.season?.id, shipId: ship.id, ship: ship.name,
     route: [plan.input.start, ...plan.calls.map(c => c.id), plan.input.end], nights: plan.input.nights,
     booked: fin.booked, pax: plan.input.ship.pax, fare, profit, sat,
     events: events.map(e => ({ key: e.key, vars: e.vars, good: e.good })),
@@ -318,8 +325,12 @@ export function sail(s: GameState): VoyageResult | null {
   if (plan.calls.some(c => region.ports[c.id].berth === 'tender' && !cancelled.has(c.id))) earnFirst(s, 'tender', firsts);
   if (plan.calls.some(c => c.refuel)) earnFirst(s, 'refuel', firsts);
   if (profit >= 100000) earnFirst(s, 'sixfig', firsts);
+  if (plan.season?.id === 'hurricane' && profit > 0) earnFirst(s, 'hurricane', firsts);
 
-  const milestones = checkMilestones(s, { profit, visited: [...visited, plan.input.end] });
+  const milestones = checkMilestones(s, {
+    profit, visited: [...visited, plan.input.end], booked: fin.booked, pax: plan.input.ship.pax,
+    season: plan.season?.id ?? '', day: plan.input.departDay,
+  });
   normalisePlan(s);
   return {
     plan, fin, events, sat, profit, extra, repBefore, repAfter: s.rep, cashBefore, cashAfter: s.cash,
@@ -338,7 +349,15 @@ function earnFirst(s: GameState, id: string, into: string[]): void {
   into.push(id);
 }
 
-export function checkMilestones(s: GameState, v: { profit: number; visited: string[] } = { profit: -Infinity, visited: [] }): string[] {
+export interface VoyageFacts { profit: number; visited: string[]; booked?: number; pax?: number; season?: string; day?: number }
+
+/** Guests carried by full-booked cruises departing in the 7 days up to `day`, in this region. */
+export function weekGuests(s: GameState, day: number): number {
+  return s.log.filter(v => v.region === s.region && v.day <= day && v.day > day - 7 && v.pax > 0 && v.booked / v.pax >= FULL_OCC)
+    .reduce((a, v) => a + v.booked, 0);
+}
+
+export function checkMilestones(s: GameState, v: VoyageFacts = { profit: -Infinity, visited: [] }): string[] {
   const gained: string[] = [];
   const list = MILESTONES[s.region] ?? [];
   // Two passes: a cash reward can complete a cash milestone.
@@ -350,7 +369,12 @@ export function checkMilestones(s: GameState, v: { profit: number; visited: stri
         && (T.visit == null || v.visited.includes(T.visit))
         && (T.profit == null || v.profit >= T.profit)
         && (T.cash == null || s.cash >= T.cash)
-        && (T.rep == null || s.rep >= T.rep);
+        && (T.rep == null || s.rep >= T.rep)
+        && (T.regionVoyages == null || s.log.filter(x => x.region === s.region).length >= T.regionVoyages)
+        && (T.soldOutPax == null || (v.booked != null && v.pax != null && v.booked >= v.pax && v.booked >= T.soldOutPax))
+        && (T.island == null || s.unlocked.portGroups.includes('island'))
+        && (T.stormProfits == null || s.log.filter(x => x.region === s.region && x.season === 'hurricane' && x.profit > 0).length >= T.stormProfits)
+        && (T.weekGuests == null || (v.day != null && weekGuests(s, v.day) >= T.weekGuests));
       if (!ok) continue;
       s.milestones.push(m.id);
       gained.push(m.id);
@@ -365,10 +389,95 @@ export function checkMilestones(s: GameState, v: { profit: number; visited: stri
   return gained;
 }
 
-/** The current goal for the title bar: the next open milestone. */
+/** The current goal for the title bar: the next open milestone, then the graduation voyage. */
 export function currentGoal(s: GameState): string | null {
   const m = (MILESTONES[s.region] ?? []).find(x => !s.milestones.includes(x.id));
-  return m ? m.id : null;
+  if (m) return m.id;
+  const g = regionOf(s).graduation;
+  return g && !s.milestones.includes(g.id) ? g.id : null;
+}
+
+// ---------- Graduation: the voyage that ends a chapter ----------
+
+export function graduationOpen(s: GameState): boolean {
+  const g = regionOf(s).graduation;
+  if (!g || g.locked || !g.toRegion) return false;
+  return isSandbox(s) || !g.requires || s.milestones.includes(g.requires);
+}
+
+export function crossingFor(s: GameState, ship: ShipRec): CrossingCheck {
+  const g = regionOf(s).graduation!;
+  const c = checkCrossing(g, ship.port, specsOf(s, ship));
+  if (ship.chartered) c.issues.unshift({ lvl: 'err', key: 'cross.chartered' }), c.ok = false;
+  return c;
+}
+
+export interface GraduationResult {
+  from: string; to: string; ships: string[]; left: string[];
+  cashBefore: number; cashAfter: number; repBefore: number; repAfter: number; firsts: string[];
+}
+
+/**
+ * Sail the chosen ships to the next region and start the next chapter. Tech, design points and
+ * blueprints carry over. Most cash resets, reputation is pulled halfway back to 3.0, and leases on
+ * ships left behind end.
+ */
+export function graduate(s: GameState, shipIds: string[]): GraduationResult | Check {
+  if (!graduationOpen(s)) return { ok: false, key: 'cross.notYet' };
+  const region = regionOf(s), g = region.graduation!;
+  const going = s.ships.filter(x => shipIds.includes(x.id));
+  if (!going.length) return { ok: false, key: 'cross.pickShip' };
+  for (const sh of going) if (!crossingFor(s, sh).ok) return { ok: false, key: 'cross.notReady', vars: { ship: sh.name } };
+  const res: GraduationResult = {
+    from: region.id, to: g.toRegion!, ships: going.map(x => x.name), left: s.ships.filter(x => !shipIds.includes(x.id)).map(x => x.name),
+    cashBefore: s.cash, cashAfter: s.cash, repBefore: s.rep, repAfter: s.rep, firsts: [],
+  };
+  for (const sh of going) {
+    const c = crossingFor(s, sh);
+    sh.day = sh.day + Math.ceil((17 + c.hours) / 24);
+    sh.port = g.toPort!;
+  }
+  s.ships = going;
+  s.milestones.push(g.id);
+  if (!isSandbox(s)) s.cash = Math.round(s.cash * (g.keepCash ?? 0.25)) + (g.grant ?? 0);
+  s.rep = Math.round((s.rep + START_REP) / 2 * 10) / 10;
+  s.region = g.toRegion!;
+  earnFirst(s, 'crossing', res.firsts);
+  s.plan = { shipId: going[0].id, nights: 7, wait: 0, stops: [], end: g.toPort!, fare: 180 };
+  res.cashAfter = s.cash;
+  res.repAfter = s.rep;
+  return res;
+}
+
+/** Sandbox only: move the whole fleet to another region's first turnaround port. */
+export function moveRegion(s: GameState, regionId: string): Check {
+  if (!isSandbox(s) || !REGIONS[regionId]) return { ok: false, key: 'cross.notYet' };
+  const port = turnarounds(REGIONS[regionId])[0];
+  s.region = regionId;
+  for (const sh of s.ships) sh.port = port;
+  s.plan.stops = [];
+  s.plan.end = port;
+  return { ok: true };
+}
+
+// ---------- Private island ----------
+
+export function canLeaseIsland(s: GameState): Check {
+  const region = regionOf(s);
+  if (!Object.values(region.ports).some(p => p.lockedBy === 'island')) return { ok: false, key: 'company.island.none' };
+  if (s.unlocked.portGroups.includes('island')) return { ok: false, key: 'company.island.owned' };
+  if (!isSandbox(s) && s.cash < ISLAND_LEASE) return { ok: false, key: 'drydock.commission.cash', vars: { cost: ISLAND_LEASE } };
+  return { ok: true };
+}
+
+export function leaseIsland(s: GameState): { milestones: string[]; firsts: string[] } | Check {
+  const c = canLeaseIsland(s);
+  if (!c.ok) return c;
+  if (!isSandbox(s)) s.cash -= ISLAND_LEASE;
+  s.unlocked.portGroups.push('island');
+  const firsts: string[] = [];
+  earnFirst(s, 'island', firsts);
+  return { milestones: checkMilestones(s), firsts };
 }
 
 // ---------- Season ----------

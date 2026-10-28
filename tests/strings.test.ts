@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { allStrings, has } from '../src/sim/strings';
 import { BLOCKS, EVENTS, FIRST_DP, HULLS, MILESTONES, REGIONS, TECH } from '../src/sim/data';
-import { STEPS } from '../src/ui/tutorial';
+import { STEPS, HINTS } from '../src/ui/tutorial';
 
 const S = allStrings();
 const words = (s: string) => s.replace(/\{\w+\}/g, 'X').replace(/<[^>]+>/g, '').split(/\s+/).filter(w => /[\p{L}\p{N}$]/u.test(w));
@@ -24,7 +24,7 @@ describe('every string the code asks for exists', () => {
       if (fn === 'tn') { if (!has(key + '.one') || !has(key + '.other')) missing.push(key + '.one/.other'); }
       else if (!has(key)) missing.push(key);
     }
-    for (const m of SRC.matchAll(/(?:add\('(?:err|warn)', |\b[EWI]\(|key: |notes\.push\(|\[')(?:')?((?:drydock|plan|trial|chart|company)\.[a-zA-Z.]+)'/g)) {
+    for (const m of SRC.matchAll(/(?:add\('(?:err|warn)', |\b[EWI]\(|key: |notes\.push\(|\[')(?:')?((?:drydock|plan|trial|chart|company|cross|event|appeal|hint|first|ledger|report)\.[a-zA-Z.]+)'/g)) {
       const key = m[1];
       if (key.endsWith('.')) continue;
       if (!has(key)) missing.push(key);
@@ -50,6 +50,13 @@ describe('every string the code asks for exists', () => {
       for (const p of Object.values(r.ports)) need.push('country.' + p.country);
     }
     for (const s of STEPS) need.push('tutorial.' + s.id);
+    for (const h of HINTS) need.push('hint.' + h.id);
+    for (let d = 0; d < 7; d++) need.push('weekday.' + d);
+    for (const r of Object.values(REGIONS)) {
+      need.push('region.' + r.id, 'chapter.' + r.id + '.intro');
+      if (r.graduation) need.push(...['name', 'goal', 'reward'].map(k => 'milestone.' + r.graduation!.id + '.' + k));
+      for (const p of Object.values(r.ports)) if (p.canalCall) need.push('canal.panama');
+    }
     for (const r of ['bottom', 'lower', 'middle', 'upper', 'top', 'boat', 'any']) need.push('role.' + r);
     for (const g of new Set(Object.values(BLOCKS).map(b => b.group))) if (g !== 'Fixed') need.push('drydock.group.' + g);
     for (const c of ['owned', 'tier', 'dp']) need.push('company.tech.cant.' + c);
@@ -68,7 +75,7 @@ describe('writing budgets', () => {
     expect(bad.map(([k]) => k)).toEqual([]);
   });
   it('every warning and error names a fix', () => {
-    const rules = entries.filter(([k]) => /^(drydock\.rule|plan)\./.test(k) && !/^plan\.(tender|canal)$/.test(k) && k !== 'plan.port.unknown');
+    const rules = entries.filter(([k]) => /^(drydock\.rule|plan|cross)\./.test(k) && !/^plan\.(tender|canal)$/.test(k) && !/^cross\.(intro|stats|ready|carry|keep|cash|rep|left|title|go|plan)$/.test(k) && k !== 'plan.port.unknown');
     const noFix = rules.filter(([, v]) => sentences(v).length !== 2);
     expect(noFix.map(([k, v]) => k + ': ' + v)).toEqual([]);
   });
@@ -80,8 +87,8 @@ describe('writing budgets', () => {
     const bad = entries.filter(([k]) => /^block\..+\.tip$/.test(k) && words(S[k]).length > 12);
     expect(bad.map(([k]) => k)).toEqual([]);
   });
-  it('tutorial steps are one sentence and one action', () => {
-    const bad = STEPS.map(s => 'tutorial.' + s.id).filter(k => sentences(S[k]).length !== 1);
+  it('tutorial steps and hints are one sentence and one action', () => {
+    const bad = [...STEPS.map(s => 'tutorial.' + s.id), ...HINTS.map(h => 'hint.' + h.id)].filter(k => sentences(S[k]).length !== 1);
     expect(bad).toEqual([]);
   });
   it('milestone goals are 6 words or fewer', () => {

@@ -15,7 +15,6 @@ import { esc, el, money } from './ui/dom';
 const root = document.getElementById('app')!;
 const settings = loadSettings();
 applySettings(settings);
-document.documentElement.setAttribute('data-tint', 'north');
 let app: App | null = null;
 
 function start(state: GameState) {
