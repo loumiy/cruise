@@ -1,0 +1,58 @@
+{
+  "puffin · Bar Harbor + Halifax · 4n": {
+    "errors": [],
+    "appeal": 53,
+    "fare": 285,
+    "booked": 120,
+    "fuel": 28,
+    "profit": 62448
+  },
+  "puffin · Portland + Saint John · 4n": {
+    "errors": [],
+    "appeal": 42,
+    "fare": 270,
+    "booked": 120,
+    "fuel": 19,
+    "profit": 65914
+  },
+  "harbor · Bar Harbor + Halifax · 4n": {
+    "errors": [],
+    "appeal": 53,
+    "fare": 235,
+    "booked": 294,
+    "fuel": 33,
+    "profit": 183636
+  },
+  "harbor · Maritimes to Québec · 7n": {
+    "errors": [],
+    "appeal": 67,
+    "fare": 240,
+    "booked": 294,
+    "fuel": 49,
+    "profit": 332183
+  },
+  "harbor · Québec to Boston · 7n": {
+    "errors": [],
+    "appeal": 66,
+    "fare": 240,
+    "booked": 294,
+    "fuel": 48,
+    "profit": 333893
+  },
+  "harbor · New York + Newport + Halifax · 5n": {
+    "errors": [],
+    "appeal": 45,
+    "fare": 225,
+    "booked": 294,
+    "fuel": 25,
+    "profit": 224416
+  },
+  "harbor · fall foliage · 5n": {
+    "errors": [],
+    "appeal": 62,
+    "fare": 245,
+    "booked": 294,
+    "fuel": 22,
+    "profit": 256682
+  }
+}

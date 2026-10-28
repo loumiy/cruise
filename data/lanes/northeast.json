@@ -1,0 +1,19 @@
+{
+  "edges": [
+    ["NYC", "A"], ["A", "B"], ["B", "NPT"], ["B", "BZM"], ["BZM", "BZW"],
+    ["BZW", "CCB", { "canal": "capeCod", "maxDraft": 9.7, "maxAir": 41, "toll": 4000 }],
+    ["CCB", "G"], ["B", "D"], ["D", "E"], ["E", "F"], ["F", "G"], ["G", "BOS"], ["G", "H"], ["H", "H2"], ["H2", "PWM"], ["H2", "I"], ["I", "J"], ["J", "BHB"],
+    ["J", "K"], ["K", "L"], ["L", "SJB"], ["J", "M"], ["F", "M"], ["K", "M"], ["M", "N"], ["N", "O"], ["O", "P"], ["P", "HFX"], ["P", "Q"], ["Q", "R"],
+    ["Q", "W", { "canal": "canso", "maxDraft": 8.5, "maxBeam": 24, "toll": 3000, "via": [[-61.2, 45.45], [-61.42, 45.7]] }],
+    ["R", "S"], ["S", "SYD"], ["S", "T"], ["T", "U"], ["W", "U"], ["W", "X"], ["X", "CHA"], ["U", "Y"], ["Y", "Z"], ["Z", "GPE"], ["Y", "AA"],
+    ["AA", "BB", { "scenic": "stLawrence", "pilotage": 2500 }],
+    ["BB", "CC", { "scenic": "stLawrence", "pilotage": 2500 }],
+    ["CC", "DD", { "scenic": "stLawrence", "pilotage": 2500 }],
+    ["DD", "YQB", { "scenic": "stLawrence", "pilotage": 2500 }],
+    ["T", "FF"], ["FF", "GG"], ["GG", "CBK"], ["T", "EE"], ["EE", "SPM"], ["R", "KK"], ["KK", "SPM"], ["SPM", "HH"], ["KK", "HH"], ["HH", "II"], ["II", "JJ"], ["JJ", "STJ"]
+  ],
+  "canals": {
+    "capeCod": { "label": [-70.6, 41.72, 10, 12, "start"] },
+    "canso": { "label": [-61.3, 45.6, -8, 22, "end"] }
+  }
+}

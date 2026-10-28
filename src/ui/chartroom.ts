@@ -1,0 +1,482 @@
+// Chartroom: click ports on the chart to build a cruise, set the fare, then sail.
+import { t, tn } from '../sim/strings';
+import { MILESTONES } from '../sim/data';
+import {
+  draftPlan, planFinance, sail, shipById, specsOf, regionOf, normalisePlan, market, seasonOver, layUp, layUpCost,
+  firstDp, isSandbox, MAX_WAIT, type VoyageResult,
+} from '../sim/game';
+import { portStatus, turnarounds, NIGHT_OPTIONS, FUEL_RESERVE, type Plan, type PlanIssue } from '../sim/planner';
+import { fareCurve, summarise, FARE_MIN, FARE_MAX, FARE_STEP, type Finance } from '../sim/economy';
+import { fmtClock, fmtDate, seasonOf } from '../sim/calendar';
+import { projector } from '../sim/geo';
+import { $, esc, money, kmoney, ICON, issueRow, el } from './dom';
+import { chartSvg, ptsAttr, shipGlyph } from './chart';
+import { sound } from './audio';
+import type { App, Screen } from './app';
+
+const COUNTRY: Record<string, string> = { US: 'country.US', CA: 'country.CA', FR: 'country.FR' };
+
+export function issueText(i: PlanIssue): string {
+  return t(i.key, i.vars);
+}
+
+export function chartroom(app: App): Screen {
+  const root = el('<div class="wrap"></div>');
+  const region = regionOf(app.state);
+  const { width: MW, height: MH, proj } = projector(region);
+  let P: Plan | null = null, F: Finance | null = null;
+  let sailing: { shown: VoyageResult['events']; raf: number } | null = null;
+
+  root.innerHTML =
+    '<div class="cr-main"><div class="cr-left">' +
+    '<div class="mapcard" id="mapcard"><div class="maphead"><span class="label">' + esc(t('chart.head', { region: region.name })) + '</span><span class="sub2" id="mapStatus"></span></div>' +
+    chartSvg(region) + '<div class="clock" id="clock" hidden></div><div class="tip" id="tip" hidden></div></div>' +
+    '<div class="panel strip"><div class="maphead" style="padding:0 0 6px"><span class="label">' + esc(t('chart.strip')) + '</span><span class="sub2" id="stripMeta"></span></div>' +
+    '<svg id="strip" viewBox="0 0 1000 150" role="img" aria-label="' + esc(t('chart.stripAria')) + '"></svg></div>' +
+    '<div class="cr-bottom"><div class="panel"><div class="label" style="margin-bottom:.5rem">' + esc(t('chart.milestones')) + '</div><div class="ms" id="milestones"></div></div>' +
+    '<div class="panel"><div class="label" style="margin-bottom:.5rem">' + esc(t('chart.log')) + '</div><div class="log" id="log"></div></div></div>' +
+    '<details class="howto"><summary>' + esc(t('help.title')) + '</summary><div>' +
+    ['schedule', 'fuel', 'pvsa', 'ports', 'fare', 'appeal'].map(k => '<p><b>' + esc(t('help.chart.' + k + '.h')) + '</b> ' + esc(t('help.chart.' + k))).join('</p>') + '</p></div></details>' +
+    '</div><aside class="panel planner" aria-label="' + esc(t('chart.planner')) + '" id="planner"></aside></div>';
+
+  const tip = $('#tip', root)!;
+
+  function render() {
+    if (sailing) return;
+    normalisePlan(app.state);
+    P = draftPlan(app.state);
+    F = P ? planFinance(app.state, P) : null;
+    renderPlanner();
+    renderRoute();
+    renderPorts();
+    renderStrip();
+    renderMilestones();
+    renderLog();
+  }
+
+  // ---------- planner ----------
+  function renderPlanner() {
+    const s = app.state, plan = s.plan, ship = shipById(s, plan.shipId)!, specs = specsOf(s, ship);
+    const box = $('#planner', root)!;
+    if (!P || !F) { box.innerHTML = ''; return; }
+    const over = seasonOver(s, ship);
+    const errs = P.issues.filter(i => i.lvl === 'err').length, warns = P.issues.filter(i => i.lvl === 'warn').length;
+    const homes = turnarounds(region);
+
+    let h = '<div data-tut="ships"><div class="label" style="margin-bottom:6px">' + esc(t('chart.ship')) + '</div><div class="ships" role="radiogroup">';
+    for (const sh of s.ships) {
+      const sp = specsOf(s, sh);
+      const fuelDays = sp.fuelCap / (24 * (sp.vmax * 0.8 * sp.burnPerNm * 0.64 + sp.hotelTph));
+      h += '<button type="button" class="ship" role="radio" aria-checked="' + (sh.id === plan.shipId) + '" data-ship="' + sh.id + '">' +
+        '<span><span class="nm">' + esc(sh.name) + '</span> <span class="sub2">' + esc(t('hull.' + sp.hull)) + (sh.chartered ? ' · ' + esc(t('chart.chartered')) : '') + '</span></span>' +
+        '<span class="loc">' + esc(t('chart.shipAt', { port: region.ports[sh.port].name, date: fmtDate(sh.day, false) })) + '</span>' +
+        '<span class="specs">' + esc(t('chart.shipSpecs', { pax: sp.pax, kn: sp.vmax, draft: sp.draft, air: sp.air, fuel: fuelDays.toFixed(1), food: Math.floor(sp.foodDays) })) + '</span></button>';
+    }
+    h += '</div></div>';
+
+    h += '<div class="row2"><div><div class="label" style="margin-bottom:4px">' + esc(t('chart.nights')) + '</div><div class="seg" id="nights">' +
+      NIGHT_OPTIONS.map(n => '<button type="button" data-nights="' + n + '" aria-pressed="' + (plan.nights === n) + '">' + n + '</button>').join('') + '</div></div>' +
+      '<div class="grow"><div class="label" style="margin-bottom:4px">' + esc(t('chart.depart')) + '</div><div class="seg days" id="wait">' +
+      Array.from({ length: MAX_WAIT + 1 }, (_, w) => '<button type="button" data-wait="' + w + '" aria-pressed="' + (plan.wait === w) + '" title="' + esc(w ? tn('chart.waitDays', w) : t('chart.waitNone')) + '">' + esc(fmtDate(ship.day + w, false).replace(/ \w+$/, '')) + '</button>').join('') +
+      '</div></div></div>';
+    const season = seasonOf(region, ship.day + plan.wait);
+    h += '<div class="sub2">' + esc(t('chart.departsOn', { date: fmtDate(ship.day + plan.wait), season: season ? t('season.' + season.id) : t('season.closed') })) +
+      (plan.wait ? ' · ' + esc(tn('chart.idle', plan.wait, { cost: kmoney(specs.lease * plan.wait) })) : '') + '</div>';
+
+    // Itinerary
+    const legLine = (i: number) => {
+      const l = P!.legs[i];
+      if (!l) return '';
+      const bad = P!.issues.some(x => x.lvl === 'err' && x.at === l.to && /late|fuel/i.test(x.key));
+      return '<div class="leg' + (bad ? ' bad' : '') + '">' + esc(t('chart.legLine', { nm: Math.round(l.r.nm), kn: l.speed.toFixed(1), h: l.sailH.toFixed(1) })) +
+        (l.idleH > 0.5 ? esc(t('chart.legAnchor', { h: l.idleH.toFixed(1) })) : '') +
+        (l.r.canals.length ? esc(t('chart.legVia', { canal: l.r.canals.map(c => t('canal.' + c)).join(', ') })) : '') + '</div>';
+    };
+    h += '<div><div class="label" style="margin-bottom:6px;display:flex;justify-content:space-between"><span>' + esc(t('chart.itinerary')) + '</span>' +
+      '<button type="button" class="btn sm" data-clear>' + esc(t('chart.clearStops')) + '</button></div><div class="itin">';
+    h += '<div class="stop"><span class="n home" aria-hidden="true">⚓</span><span><span class="nm">' + esc(region.ports[ship.port].name) + '</span><br><span class="tm">' + esc(t('chart.embark')) + '</span></span><span class="sub2">' + esc(t('chart.shipHere')) + '</span></div>';
+    if (!plan.stops.length) h += '<div class="empty">' + esc(t('chart.noStops')) + '</div>';
+    plan.stops.forEach((id, i) => {
+      h += legLine(i);
+      const c = P!.calls[i];
+      h += '<div class="stop"><span class="n">' + (i + 1) + '</span><span><span class="nm">' + esc(region.ports[id].name) + '</span><br><span class="tm">' +
+        esc(c ? fmtClock(c.arr) + ' → ' + fmtClock(c.dep) + (c.refuel ? ' · ' + t('chart.refuel') : '') : t('chart.notReached')) + '</span></span>' +
+        '<span class="ctl"><button class="btn sm" data-up="' + i + '" type="button" aria-label="' + esc(t('chart.moveUp')) + '"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
+        '<button class="btn sm" data-dn="' + i + '" type="button" aria-label="' + esc(t('chart.moveDown')) + '"' + (i === plan.stops.length - 1 ? ' disabled' : '') + '>↓</button>' +
+        '<button class="btn sm" data-rm="' + i + '" type="button" aria-label="' + esc(t('chart.remove')) + '">×</button></span></div>';
+    });
+    h += legLine(plan.stops.length);
+    const lastLeg = P.legs.length === plan.stops.length + 1 ? P.legs[P.legs.length - 1] : null;
+    h += '<div class="stop"><span class="n home" aria-hidden="true">⚓</span><span><label class="nm">' + esc(t('chart.disembark')) + ' <select class="sel" id="endSel" aria-label="' + esc(t('chart.turnaround')) + '">' +
+      homes.map(k => '<option value="' + k + '"' + (k === plan.end ? ' selected' : '') + '>' + esc(region.ports[k].name) + '</option>').join('') + '</select></label><br>' +
+      '<span class="tm">' + esc(lastLeg ? t('chart.arriveDue', { arr: fmtClock(lastLeg.arr), due: fmtClock(P.deadline) }) : t('chart.due', { due: fmtClock(P.deadline) })) + '</span></span><span></span></div>';
+    h += '</div></div>';
+
+    // Fare
+    h += '<div class="fare" data-tut="fare"><div class="top"><label class="label" for="fare">' + esc(t('chart.fare')) + '</label><span class="val" id="fareVal"></span></div>' +
+      '<input type="range" id="fare" min="' + FARE_MIN + '" max="' + FARE_MAX + '" step="' + FARE_STEP + '" value="' + plan.fare + '">' +
+      '<div class="curve"><svg id="curve" viewBox="0 0 320 92" role="img" aria-label="' + esc(t('chart.curveAria')) + '"></svg></div>' +
+      '<div class="mix"><svg id="mix" viewBox="0 0 320 14" role="img" aria-label="' + esc(t('chart.mixAria')) + '"></svg><div class="keys" id="mixKeys"></div></div></div>';
+    h += '<div class="kpis" id="kpis"></div>';
+    h += '<div><div class="label" style="margin-bottom:6px">' + esc(t('chart.inspection', { e: errs, w: warns })) + '</div><div class="issues" id="issues"></div></div>';
+    h += '<div class="ledger" id="ledger"></div>';
+    if (over) {
+      h += '<div class="issue warn"><span class="ic">' + ICON.warn + '</span><span>' + esc(t('chart.layup.why')) + '</span></div>' +
+        '<button type="button" class="btn primary big" data-layup>' + esc(t('chart.layup.btn', { cost: kmoney(layUpCost(s, ship)) })) + '</button>';
+    } else {
+      h += '<button type="button" class="btn primary big" id="btnSail" data-tut="sail"' + (P.errors ? ' disabled' : '') + '>' +
+        esc(P.errors ? tn('chart.fixToSail', P.errors) : t('chart.sail', { nights: plan.nights, port: region.ports[ship.port].name })) + '</button>';
+    }
+    box.innerHTML = h;
+    wirePlanner(box);
+    renderFare();
+    renderIssues();
+  }
+
+  function wirePlanner(box: HTMLElement) {
+    const s = app.state, plan = s.plan;
+    const change = (fn: () => void) => { fn(); sound.click(app.settings); render(); app.commit({ render: false }); };
+    box.querySelectorAll<HTMLButtonElement>('[data-ship]').forEach(b => b.onclick = () => change(() => {
+      plan.shipId = b.dataset.ship!;
+      const sh = shipById(s, plan.shipId)!;
+      if (!region.ports[plan.end]?.turnaround) plan.end = sh.port;
+    }));
+    box.querySelectorAll<HTMLButtonElement>('[data-nights]').forEach(b => b.onclick = () => change(() => { plan.nights = Number(b.dataset.nights); }));
+    box.querySelectorAll<HTMLButtonElement>('[data-wait]').forEach(b => b.onclick = () => change(() => { plan.wait = Number(b.dataset.wait); }));
+    box.querySelectorAll<HTMLButtonElement>('[data-up]').forEach(b => b.onclick = () => change(() => { const i = Number(b.dataset.up); [plan.stops[i - 1], plan.stops[i]] = [plan.stops[i], plan.stops[i - 1]]; }));
+    box.querySelectorAll<HTMLButtonElement>('[data-dn]').forEach(b => b.onclick = () => change(() => { const i = Number(b.dataset.dn); [plan.stops[i + 1], plan.stops[i]] = [plan.stops[i], plan.stops[i + 1]]; }));
+    box.querySelectorAll<HTMLButtonElement>('[data-rm]').forEach(b => b.onclick = () => change(() => { plan.stops.splice(Number(b.dataset.rm), 1); }));
+    box.querySelector<HTMLButtonElement>('[data-clear]')!.onclick = () => change(() => { plan.stops = []; });
+    box.querySelector<HTMLSelectElement>('#endSel')!.onchange = e => change(() => { plan.end = (e.target as HTMLSelectElement).value; });
+    const fare = box.querySelector<HTMLInputElement>('#fare')!;
+    fare.oninput = () => {
+      plan.fare = Number(fare.value);
+      if (P) F = planFinance(s, P);
+      renderFare(); renderKpisLedger();
+    };
+    fare.onchange = () => app.commit({ render: false });
+    box.querySelector<HTMLButtonElement>('#btnSail')?.addEventListener('click', startSail);
+    const lu = box.querySelector<HTMLButtonElement>('[data-layup]');
+    if (lu) lu.onclick = () => {
+      const r = layUp(s, plan.shipId);
+      if (r.ok) { app.toast(t('chart.layup.done', { date: fmtDate(shipById(s, plan.shipId)!.day) }), 'ok'); app.commit(); }
+    };
+  }
+
+  function renderFare() {
+    if (!P || !F) return;
+    const s = app.state;
+    $('#fareVal', root)!.textContent = '$' + s.plan.fare;
+    const pts = fareCurve(region, P.input.ship, summarise(P, s.plan.wait), market(s));
+    let lo = Math.min(0, ...pts.map(p => p[1])), hi = Math.max(1, ...pts.map(p => p[1]));
+    if (hi === lo) hi = lo + 1;
+    const X = (f: number) => 10 + (f - FARE_MIN) / (FARE_MAX - FARE_MIN) * 300, Y = (v: number) => 8 + (hi - v) / (hi - lo) * 64;
+    const best = pts.reduce((a, b) => b[1] > a[1] ? b : a);
+    const rival = region.market.rivalFare;
+    const line = pts.map(p => X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join(' L');
+    let sv = '<line x1="10" x2="310" y1="' + Y(0) + '" y2="' + Y(0) + '" stroke="var(--ink-2)" stroke-width="1" stroke-dasharray="3 3"/>';
+    sv += '<path d="M' + line + ' L310 ' + Y(lo) + ' L10 ' + Y(lo) + ' Z" fill="color-mix(in srgb,var(--accent) 12%,transparent)"/>';
+    sv += '<path d="M' + line + '" fill="none" stroke="var(--accent)" stroke-width="2"/>';
+    sv += '<line x1="' + X(rival) + '" x2="' + X(rival) + '" y1="6" y2="72" stroke="var(--mass)" stroke-width="1.5"/><text x="' + (X(rival) + 3) + '" y="14" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-2)">' + esc(t('chart.rivalFare', { fare: rival })) + '</text>';
+    sv += '<line x1="' + X(best[0]) + '" x2="' + X(best[0]) + '" y1="' + Y(best[1]) + '" y2="72" stroke="var(--ink-2)" stroke-width="1" stroke-dasharray="2 2"/>';
+    sv += '<circle cx="' + X(s.plan.fare) + '" cy="' + Y(F.profit) + '" r="4.5" fill="var(--sheet)" stroke="var(--ink)" stroke-width="2"/>';
+    sv += '<text x="10" y="86" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)">$' + FARE_MIN + '</text><text x="310" y="86" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)">$' + FARE_MAX + '</text>';
+    sv += '<text x="' + Math.min(290, Math.max(40, X(best[0]))) + '" y="86" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)">' + esc(t('chart.best', { fare: best[0], profit: kmoney(best[1]) })) + '</text>';
+    sv += '<text x="308" y="' + (Y(0) - 3) + '" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-2)">' + esc(t('chart.breakEven')) + '</text>';
+    $('#curve', root)!.innerHTML = sv;
+    // Guest mix: mass and premium bookings against berths.
+    const pax = Math.max(1, P.input.ship.pax);
+    const wM = F.bookedMass / pax * 320, wP = F.bookedPremium / pax * 320;
+    $('#mix', root)!.innerHTML = '<rect x="0" y="0" width="320" height="14" fill="var(--rule-2)"/><rect x="0" y="0" width="' + wM.toFixed(1) + '" height="14" fill="var(--mass)"/>' +
+      '<rect x="' + wM.toFixed(1) + '" y="0" width="' + wP.toFixed(1) + '" height="14" fill="var(--premium)"/>';
+    $('#mixKeys', root)!.innerHTML = '<span><i style="background:var(--mass)"></i>' + esc(t('chart.mass', { n: F.bookedMass })) + '</span><span><i style="background:var(--premium)"></i>' + esc(t('chart.premium', { n: F.bookedPremium })) + '</span><span>' + esc(t('chart.empty', { n: pax - F.booked })) + '</span>';
+    renderKpisLedger();
+  }
+
+  function renderKpisLedger() {
+    if (!P || !F) return;
+    const s = app.state, ship = P.input.ship;
+    const occS = F.occ >= 0.85 ? 'ok' : F.occ >= 0.6 ? 'warn' : 'err';
+    const scS = P.score >= 55 ? 'ok' : P.score >= 35 ? 'warn' : 'err';
+    const prS = F.profit > 0 ? 'ok' : 'err';
+    $('#kpis', root)!.innerHTML =
+      '<div class="kpi ' + scS + '"><span class="label">' + esc(t('chart.appeal')) + '</span><b>' + ICON[scS] + ' ' + P.score + '</b><span class="sub2">' + esc(t('chart.of100')) + '</span></div>' +
+      '<div class="kpi ' + occS + '"><span class="label">' + esc(t('chart.booked')) + '</span><b>' + ICON[occS] + ' ' + Math.round(F.occ * 100) + '%</b><span class="sub2">' + F.booked + ' / ' + ship.pax + '</span></div>' +
+      '<div class="kpi ' + prS + '"><span class="label">' + esc(t('chart.profit')) + '</span><b>' + ICON[prS] + ' ' + kmoney(F.profit) + '</b><span class="sub2">' + esc(t('chart.projected')) + '</span></div>';
+    const ap = P.parts.map(p => '<span>' + esc(t(p.key, p.vars)) + '</span><span class="mono">' + (p.v > 0 ? '+' : '') + p.v + '</span>').join('');
+    $('#ledger', root)!.innerHTML = '<span class="label hd">' + esc(t('chart.appealHead', { season: P.season ? t('season.' + P.season.id) : t('season.closed') })) + '</span>' +
+      (ap || '<span class="sub2">' + esc(t('chart.noPorts')) + '</span><span></span>') +
+      '<span class="label hd">' + esc(t('chart.pnl')) + '</span>' +
+      '<span>' + esc(t('ledger.fares', { n: F.booked, fare: s.plan.fare, nights: P.input.nights })) + '</span><span class="mono">' + money(F.rev) + '</span>' +
+      '<span>' + esc(t('ledger.onboard')) + '</span><span class="mono">' + money(F.onboard) + '</span>' +
+      '<span>' + esc(t('ledger.crew')) + '</span><span class="mono">' + money(-F.crew) + '</span>' +
+      '<span>' + esc(t('ledger.lease')) + '</span><span class="mono">' + money(-F.lease) + '</span>' +
+      '<span>' + esc(t('ledger.food')) + '</span><span class="mono">' + money(-F.food) + '</span>' +
+      '<span>' + esc(t('ledger.fuel', { t: P.burned.toFixed(1) })) + '</span><span class="mono">' + money(-F.fuel) + '</span>' +
+      '<span>' + esc(t('ledger.ports')) + '</span><span class="mono">' + money(-F.ports) + '</span>' +
+      (F.fees ? '<span>' + esc(t('ledger.tolls')) + '</span><span class="mono">' + money(-F.fees) + '</span>' : '') +
+      '<span class="tot">' + esc(t('ledger.profit')) + '</span><span class="mono tot" style="color:' + (F.profit >= 0 ? 'var(--ok)' : 'var(--err)') + '">' + money(F.profit) + '</span>';
+  }
+
+  function renderIssues() {
+    if (!P) return;
+    const list = $('#issues', root)!;
+    const sorted = P.issues.slice().sort((a, b) => 'ewi'.indexOf(a.lvl[0]) - 'ewi'.indexOf(b.lvl[0]));
+    const bad = sorted.filter(i => i.lvl !== 'info');
+    list.innerHTML = (bad.length ? '' : '<div class="clear-ok">' + ICON.ok + ' ' + esc(t('chart.allClear')) + '</div>') +
+      sorted.map(i => issueRow(i.lvl, issueText(i), '', i.at ? 'data-at="' + i.at + '"' : '')).join('');
+    list.querySelectorAll<HTMLButtonElement>('[data-at]').forEach(b => b.onclick = () => showTip(b.dataset.at!));
+  }
+
+  // ---------- chart layers ----------
+  function renderRoute() {
+    const g = $('#routeLayer', root)!;
+    if (!P) { g.innerHTML = ''; return; }
+    const errAt = new Set(P.issues.filter(i => i.lvl === 'err' && i.at).map(i => i.at));
+    let s = '';
+    P.legs.forEach(l => {
+      const bad = errAt.has(l.to);
+      const pts = ptsAttr(region, l.r.pts);
+      s += '<polyline points="' + pts + '" fill="none" stroke="var(--water)" stroke-width="6" stroke-linejoin="round" opacity=".8"/>';
+      s += '<polyline points="' + pts + '" fill="none" stroke="' + (bad ? 'var(--err)' : 'var(--accent)') + '" stroke-width="2.6" stroke-linejoin="round"' + (bad ? ' stroke-dasharray="7 4"' : '') + '/>';
+      const pp = l.r.pts.map(p => proj(p[0], p[1]));
+      let tot = 0;
+      const seg: number[] = [];
+      for (let k = 1; k < pp.length; k++) { const d = Math.hypot(pp[k][0] - pp[k - 1][0], pp[k][1] - pp[k - 1][1]); seg.push(d); tot += d; }
+      let half = tot / 2, k = 0;
+      while (k < seg.length - 1 && half > seg[k]) { half -= seg[k]; k++; }
+      const a = pp[k], b = pp[k + 1] ?? pp[k], f = seg[k] ? half / seg[k] : 0;
+      const x = a[0] + (b[0] - a[0]) * f, y = a[1] + (b[1] - a[1]) * f, ang = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
+      s += '<path d="M-6 -5 L6 0 L-6 5 Z" transform="translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') rotate(' + ang.toFixed(0) + ')" fill="' + (bad ? 'var(--err)' : 'var(--accent)') + '"/>';
+    });
+    g.innerHTML = s;
+    $('#mapStatus', root)!.textContent = P.legs.length ? t('chart.status', { nm: Math.round(P.nm), calls: P.calls.length, sea: P.seaDays }) : '';
+  }
+
+  function renderPorts() {
+    const g = $('#portLayer', root)!;
+    const s = app.state, ship = shipById(s, s.plan.shipId)!, specs = specsOf(s, ship);
+    g.innerHTML = '';
+    for (const id of Object.keys(region.ports)) {
+      const p = region.ports[id], [x, y] = proj(p.lon, p.lat);
+      const st = portStatus(region, id, specs, s.unlocked.portGroups, isSandbox(s));
+      const idx = s.plan.stops.map((v, i) => v === id ? i + 1 : 0).filter(Boolean);
+      const isHome = id === ship.port || id === s.plan.end;
+      const n = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      n.setAttribute('class', 'port' + (st.ok ? '' : ' blocked') + (!st.ok && st.locked ? ' locked' : ''));
+      n.setAttribute('tabindex', '0');
+      n.setAttribute('role', 'button');
+      n.setAttribute('data-port', id);
+      n.setAttribute('aria-label', p.name + ', ' + (st.ok ? t('chart.portAdd') : t(st.key, st.vars)));
+      let inner = '';
+      if (idx.length) inner += '<circle class="mk" r="10" fill="var(--accent)"/><text text-anchor="middle" y="4" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" fill="var(--accent-ink)" stroke="none">' + idx.join(',') + '</text>';
+      else if (isHome) inner += '<rect class="mk" x="-7" y="-7" width="14" height="14" fill="var(--ink)"/>';
+      else if (!st.ok) inner += '<g class="mk"><circle r="5.5" fill="var(--sheet)"/><path d="M-3 -3 L3 3 M3 -3 L-3 3" stroke="var(--muted)" stroke-width="1.6"/></g>';
+      else inner += '<circle class="mk" r="5.5" fill="' + (p.turnaround ? 'var(--ink)' : 'var(--sheet)') + '"/>';
+      if (!st.ok && st.locked) inner += '<text x="0" y="-9" text-anchor="middle" font-size="10" fill="var(--muted)" stroke="none">🔒</text>';
+      if (p.berth === 'tender') inner += '<text x="7" y="-5" font-size="9" fill="var(--ink-2)" stroke="none" font-family="IBM Plex Mono, monospace">T</text>';
+      const [dx, dy, an] = p.label;
+      inner += '<text class="lbl" x="' + dx + '" y="' + dy + '" text-anchor="' + an + '">' + esc(p.name) + (p.country === 'FR' ? ' (FR)' : '') + '</text>';
+      inner += '<circle class="hit" r="14"/>';
+      n.innerHTML = inner;
+      n.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')');
+      n.addEventListener('pointerenter', () => showTip(id));
+      n.addEventListener('pointerleave', hideTip);
+      n.addEventListener('focus', () => showTip(id));
+      n.addEventListener('blur', hideTip);
+      const act = () => {
+        if (sailing) return;
+        if (!st.ok) { sound.red(app.settings); showTip(id); return; }
+        if (id === ship.port && !s.plan.stops.length) { showTip(id); return; }
+        s.plan.stops.push(id);
+        sound.click(app.settings);
+        render();
+        app.commit({ render: false });
+        showTip(id);
+      };
+      n.addEventListener('click', act);
+      n.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } });
+      g.appendChild(n);
+    }
+    if (!sailing) {
+      const [x, y] = proj(region.ports[ship.port].lon, region.ports[ship.port].lat);
+      $('#shipLayer', root)!.innerHTML = shipGlyph(x + 12, y - 12, 0);
+    }
+  }
+
+  function showTip(id: string) {
+    const s = app.state, ship = shipById(s, s.plan.shipId)!, specs = specsOf(s, ship);
+    const p = region.ports[id], st = portStatus(region, id, specs, s.unlocked.portGroups, isSandbox(s));
+    const card = $('#mapcard', root)!;
+    let status = st.ok ? (id === ship.port && !s.plan.stops.length ? t('chart.tip.here') : t('chart.tip.add', { n: s.plan.stops.length + 1 })) : t(st.key, st.vars);
+    if (st.ok && s.plan.stops.includes(id)) status = t('chart.tip.again');
+    tip.innerHTML = '<h4>' + esc(p.name) + '</h4><div class="sub2">' + esc(t(COUNTRY[p.country])) + (p.turnaround ? ' · ' + esc(t('chart.tip.turnaround')) : '') + '</div>' +
+      '<div class="tags">' + p.tags.map(x => '<span class="tag">' + esc(x) + '</span>').join('') + '</div>' +
+      '<div class="row"><span>' + esc(t('chart.tip.appeal')) + '</span><span class="mono">' + p.appeal[0] + ' / ' + p.appeal[1] + '</span></div>' +
+      '<div class="row"><span>' + esc(t('chart.tip.berth')) + '</span><span class="mono">' + esc(p.berth === 'tender' ? t('chart.tip.tender') : t('chart.tip.pier', { draft: p.maxDraft ?? '—', len: p.maxLength ?? '—' })) + '</span></div>' +
+      '<div class="row"><span>' + esc(t('chart.tip.fuel')) + '</span><span class="mono">' + esc(p.fuel ? t('chart.tip.fuelYes') : t('chart.tip.fuelNo')) + '</span></div>' +
+      '<div class="row"><span>' + esc(t('chart.tip.fees')) + '</span><span class="mono">$' + p.callFee.toLocaleString('en-US') + ' + $' + p.headTax + '/' + esc(t('chart.tip.guest')) + '</span></div>' +
+      '<div class="st ' + (st.ok ? 'ok' : 'bad') + '">' + (st.ok ? ICON.ok : ICON.err) + ' ' + esc(status) + '</div>';
+    tip.hidden = false;
+    const svgR = $('#map', root)!.getBoundingClientRect(), cR = card.getBoundingClientRect();
+    const [x, y] = proj(p.lon, p.lat);
+    const sx = svgR.left - cR.left + x / MW * svgR.width, sy = svgR.top - cR.top + y / MH * svgR.height;
+    const tw = 260;
+    let left = sx + 16;
+    if (left + tw > cR.width - 6) left = sx - 16 - tw;
+    left = Math.max(6, left);
+    let top = sy - 20;
+    const th = tip.offsetHeight;
+    if (top + th > cR.height - 6) top = cR.height - 6 - th;
+    tip.style.left = left + 'px';
+    tip.style.top = Math.max(6, top) + 'px';
+  }
+  function hideTip() { tip.hidden = true; }
+
+  // ---------- schedule strip ----------
+  function renderStrip(plan: Plan | null = P) {
+    const svg = $('#strip', root)!;
+    if (!plan) { svg.innerHTML = ''; return; }
+    const ship = plan.input.ship, nights = plan.input.nights;
+    const span = nights * 24 + 24, X = (h: number) => 20 + h / span * 965;
+    let s = '';
+    for (let d = 0; d <= nights; d++) {
+      s += '<rect x="' + X(d * 24 - 4) + '" y="16" width="' + (X(10) - X(0)) + '" height="118" fill="var(--rule-2)" opacity=".6"/>';
+      s += '<line x1="' + X(d * 24) + '" x2="' + X(d * 24) + '" y1="12" y2="134" stroke="var(--rule)"/><text x="' + (X(d * 24) + 4) + '" y="11" font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink-2)">' + esc(t('chart.day', { n: d + 1 })) + '</text>';
+    }
+    s += '<line x1="' + X(plan.deadline) + '" x2="' + X(plan.deadline) + '" y1="14" y2="134" stroke="var(--err)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="' + (X(plan.deadline) - 4) + '" y="146" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--err)">' + esc(t('chart.guestsOff', { t: fmtClock(plan.deadline) })) + '</text>';
+    const yb = 40;
+    plan.legs.forEach(l => {
+      s += '<line x1="' + X(l.dep) + '" x2="' + X(l.dep + l.sailH) + '" y1="' + yb + '" y2="' + yb + '" stroke="var(--accent)" stroke-width="3"/>';
+      if (l.idleH > 0.3) s += '<line x1="' + X(l.dep + l.sailH) + '" x2="' + X(l.arr) + '" y1="' + yb + '" y2="' + yb + '" stroke="var(--ink-2)" stroke-width="2" stroke-dasharray="2 3"/>';
+    });
+    s += '<rect x="' + (X(17) - 3) + '" y="' + (yb - 12) + '" width="6" height="24" fill="var(--ink)"/>';
+    plan.calls.forEach(c => {
+      s += '<rect x="' + X(c.arr) + '" y="' + (yb - 12) + '" width="' + (X(c.dep) - X(c.arr)) + '" height="24" fill="var(--sheet)" stroke="var(--ink)" stroke-width="1.5"/><text x="' + ((X(c.arr) + X(c.dep)) / 2) + '" y="' + (yb + 4) + '" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600" fill="var(--ink)">' + c.id + '</text>';
+    });
+    if (plan.legs.length === plan.input.stops.length + 1) {
+      const l = plan.legs[plan.legs.length - 1];
+      s += '<rect x="' + (X(l.arr) - 3) + '" y="' + (yb - 12) + '" width="6" height="24" fill="' + (l.arr > plan.deadline + 0.05 ? 'var(--err)' : 'var(--ink)') + '"/>';
+    }
+    const fy = (v: number) => 132 - Math.max(-0.15, v / ship.fuelCap) * 64;
+    s += '<line x1="20" x2="985" y1="' + fy(ship.fuelCap * FUEL_RESERVE) + '" y2="' + fy(ship.fuelCap * FUEL_RESERVE) + '" stroke="var(--warn)" stroke-dasharray="3 3"/><text x="22" y="' + (fy(ship.fuelCap * FUEL_RESERVE) - 3) + '" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--warn)">' + esc(t('chart.reserve')) + '</text>';
+    s += '<text x="22" y="' + (fy(ship.fuelCap) + 9) + '" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ink-2)">' + esc(t('chart.fuelTank', { t: ship.fuelCap })) + '</text>';
+    s += '<polyline points="' + plan.fuelPts.map(([h, v]) => X(h).toFixed(1) + ',' + fy(v).toFixed(1)).join(' ') + '" fill="none" stroke="' + (plan.minFuel < 0 ? 'var(--err)' : 'var(--ink)') + '" stroke-width="2"/>';
+    plan.calls.filter(c => c.refuel).forEach(c => { s += '<text x="' + X(c.dep) + '" y="' + (fy(ship.fuelCap) - 4) + '" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="var(--ok)">' + esc(t('chart.refuel')) + '</text>'; });
+    svg.innerHTML = s;
+    $('#stripMeta', root)!.textContent = t('chart.stripMeta', { t: plan.burned.toFixed(1), pct: Math.round(plan.minFuel / ship.fuelCap * 100) });
+  }
+
+  function renderMilestones() {
+    const s = app.state;
+    $('#milestones', root)!.innerHTML = (MILESTONES[s.region] ?? []).map(m => {
+      const done = s.milestones.includes(m.id);
+      return '<div class="m' + (done ? ' done' : '') + '"><span class="box" aria-label="' + esc(done ? t('ui.done') : t('ui.open')) + '">' + (done ? '✓' : '') + '</span>' +
+        '<span><b>' + esc(t('milestone.' + m.id + '.name')) + '</b><br><span class="ds">' + esc(t('milestone.' + m.id + '.goal')) + '</span></span><span class="rw">' + esc(t('milestone.' + m.id + '.reward')) + '</span></div>';
+    }).join('') + '<div class="m"><span class="box">·</span><span><b>' + esc(t('chart.graduation')) + '</b><br><span class="ds">' + esc(t('chart.graduationGoal')) + '</span></span><span class="rw">' + esc(t('chart.comingSoon')) + '</span></div>';
+  }
+
+  function renderLog() {
+    const box = $('#log', root)!;
+    const s = app.state;
+    if (sailing) {
+      box.innerHTML = sailing.shown.map(e => '<div class="e"><span class="mono sub2">' + esc(fmtClock(e.t)) + '</span><span class="' + (e.good ? 'good' : 'bad') + '">' + (e.good ? ICON.ok : ICON.warn) + ' ' + esc(t(e.key, e.vars)) + '</span><span></span></div>').join('') || '<p class="hint">' + esc(t('chart.underway')) + '</p>';
+      return;
+    }
+    box.innerHTML = s.log.length ? s.log.slice().reverse().map(v => '<div class="e"><span class="mono sub2">#' + v.n + '</span><span>' + esc(v.route.map(id => region.ports[id]?.name ?? id).join(' → ')) + ' · ' + esc(v.ship) + ' · ' + esc(t('chart.satShort', { n: v.sat })) + '</span><span class="mono ' + (v.profit >= 0 ? 'good' : 'bad') + '">' + kmoney(v.profit) + '</span></div>').join('')
+      : '<p class="hint">' + esc(t('chart.noVoyages')) + '</p>';
+  }
+
+  // ---------- sailing ----------
+  function startSail() {
+    if (!P || P.errors || sailing) return;
+    const res = sail(app.state);
+    if (!res) return;
+    sound.horn(app.settings);
+    hideTip();
+    const plan = res.plan;
+    const segs: { t0: number; t1: number; pp?: [number, number][]; cum?: number[]; stay?: [number, number] }[] = [];
+    plan.legs.forEach((l, i) => {
+      const pp = l.r.pts.map(p => proj(p[0], p[1]));
+      const cum = [0];
+      for (let k = 1; k < pp.length; k++) cum.push(cum[k - 1] + Math.hypot(pp[k][0] - pp[k - 1][0], pp[k][1] - pp[k - 1][1]));
+      segs.push({ t0: l.dep, t1: l.dep + l.sailH, pp, cum });
+      segs.push({ t0: l.dep + l.sailH, t1: i < plan.calls.length ? plan.calls[i].dep : l.arr, stay: pp[pp.length - 1] });
+    });
+    const T0 = 17, T1 = plan.ret;
+    const instant = app.settings.instant || app.reduced();
+    const dur = instant ? 0 : 10000 / app.settings.speed;
+    sailing = { shown: [], raf: 0 };
+    root.querySelectorAll<HTMLButtonElement | HTMLInputElement | HTMLSelectElement>('#planner button, #planner input, #planner select').forEach(x => { x.disabled = true; });
+    renderStrip(plan);
+    renderLog();
+    const clock = $('#clock', root)!;
+    clock.hidden = instant;
+    const posAt = (h: number) => {
+      for (const sg of segs) {
+        if (h <= sg.t1 || sg === segs[segs.length - 1]) {
+          if (sg.stay) return { x: sg.stay[0], y: sg.stay[1], a: 0 };
+          const pp = sg.pp!, cum = sg.cum!;
+          const f = Math.max(0, Math.min(1, (h - sg.t0) / (sg.t1 - sg.t0 || 1))), d = f * cum[cum.length - 1];
+          let k = 1;
+          while (k < cum.length - 1 && cum[k] < d) k++;
+          const a = pp[k - 1], b = pp[k], ff = (d - cum[k - 1]) / ((cum[k] - cum[k - 1]) || 1);
+          return { x: a[0] + (b[0] - a[0]) * ff, y: a[1] + (b[1] - a[1]) * ff, a: Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI };
+        }
+      }
+      return { x: 0, y: 0, a: 0 };
+    };
+    let lastA = 0;
+    const startMs = performance.now();
+    const step = (now: number) => {
+      if (!sailing) return;
+      const f = dur ? Math.min(1, (now - startMs) / dur) : 1, h = T0 + (T1 - T0) * f, p = posAt(h);
+      if (p.a !== 0) lastA = p.a;
+      $('#shipLayer', root)!.innerHTML = shipGlyph(p.x, p.y, lastA);
+      clock.textContent = fmtClock(h).replace('D', t('chart.dayShort'));
+      const newly = res.events.filter(e => e.t <= h && !sailing!.shown.includes(e));
+      if (newly.length) { sailing.shown.push(...newly); renderLog(); }
+      if (f < 1) sailing.raf = requestAnimationFrame(step);
+      else finish(res);
+    };
+    if (instant) finish(res); else sailing.raf = requestAnimationFrame(step);
+  }
+
+  function finish(res: VoyageResult) {
+    sailing = null;
+    $('#clock', root)!.hidden = true;
+    app.commit();
+    const s = app.state, plan = res.plan, ship = shipById(s, res.shipId)!;
+    const kind = res.profit >= 0 && res.sat >= 65 ? 'ok' : res.profit >= 0 ? 'warn' : 'err';
+    if (res.milestones.length) sound.good(app.settings);
+    const routeTxt = [plan.input.start, ...plan.calls.map(c => c.id), plan.input.end].map(id => region.ports[id].name).join(' → ');
+    const body =
+      '<div class="verdict ' + kind + '">' + ICON[kind] + ' ' + esc(res.profit >= 0 ? t('report.profit', { v: money(res.profit) }) : t('report.loss', { v: money(res.profit) })) + ' · ' + esc(t('report.sat', { n: res.sat })) + '</div>' +
+      '<div class="sub2">' + esc(routeTxt) + '</div>' +
+      '<div class="ledger"><span>' + esc(t('report.booked')) + '</span><span class="mono">' + res.fin.booked + ' / ' + plan.input.ship.pax + '</span>' +
+      '<span>' + esc(t('report.projected')) + '</span><span class="mono">' + money(res.fin.profit) + '</span>' +
+      '<span>' + esc(t('report.events')) + '</span><span class="mono">' + money(-res.extra) + '</span>' +
+      '<span class="tot">' + esc(t('report.actual')) + '</span><span class="mono tot">' + money(res.profit) + '</span>' +
+      '<span>' + esc(t('ui.reputation')) + '</span><span class="mono">' + res.repBefore.toFixed(1) + ' → ' + res.repAfter.toFixed(1) + '</span>' +
+      (isSandbox(s) ? '' : '<span>' + esc(t('ui.cash')) + '</span><span class="mono">' + money(res.cashBefore) + ' → ' + money(res.cashAfter) + '</span>') + '</div>' +
+      '<div><div class="label" style="margin-bottom:4px">' + esc(t('chart.log')) + '</div>' +
+      (res.events.length ? '<ul>' + res.events.map(e => '<li class="' + (e.good ? 'good' : 'bad') + '">' + esc(t(e.key, e.vars)) + '</li>').join('') + '</ul>' : '<p class="hint">' + esc(t('report.quiet')) + '</p>') + '</div>' +
+      res.milestones.map(m => '<div class="unlock"><b>' + esc(t('report.milestone', { name: t('milestone.' + m + '.name') })) + '</b> ' + esc(t('milestone.' + m + '.reward')) + '</div>').join('') +
+      (res.firsts.length ? '<div class="first"><b>' + esc(tn('report.firsts', res.firsts.length, { dp: res.dp })) + '</b> ' + esc(res.firsts.map(f => firstName(f, region)).join(' · ')) + '</div>' : '') +
+      '<p class="hint">' + esc(t('report.nowAt', { ship: ship.name, port: region.ports[ship.port].name, date: fmtDate(ship.day) })) + '</p>';
+    app.modal({ title: t('report.title', { n: res.logN }), sub: ship.name + ' · ' + tn('report.nights', plan.input.nights) + ' · ' + (plan.season ? t('season.' + plan.season.id) : ''), body, buttons: [{ label: t('report.back'), primary: true }] });
+  }
+
+  return {
+    el: root,
+    render,
+    destroy() { if (sailing) cancelAnimationFrame(sailing.raf); sailing = null; },
+  };
+}
+
+export function firstName(id: string, region: { ports: Record<string, { name: string }> }): string {
+  const [k, v] = id.split(':');
+  if (k === 'port') return t('first.port', { port: region.ports[v]?.name ?? v, dp: firstDp(id) });
+  if (k === 'region') return t('first.region', { dp: firstDp(id) });
+  return t('first.' + k, { dp: firstDp(id) });
+}
