@@ -75,6 +75,11 @@ export function rollEvents(plan: Plan, ship: ShipSpecs, booked: number, seed: nu
       out.push({ id: 'crowded', t: c.arr + 2, key: 'event.crowded', vars: { port: p.name, n: c.crowd.toLocaleString('en-US') }, sat: -3, cost: 0, good: false });
     }
   }
+  // Burning ordinary fuel inside an emissions control area risks an inspection and a fine.
+  if (region.eca && plan.fuelMode === 'standard' && plan.calls.length && rnd() < region.eca.fineOdds) {
+    const c = plan.calls[Math.floor(rnd() * plan.calls.length)];
+    out.push({ id: 'ecaFine', t: c.arr + 3, key: 'event.ecaFine', vars: { port: P[c.id].name, fine: '$' + Math.round(region.eca.fine / 1000) + 'k' }, sat: 0, cost: region.eca.fine, good: false });
+  }
   for (const c of plan.calls) {
     const p = P[c.id];
     if (closed.has(c.id)) continue;

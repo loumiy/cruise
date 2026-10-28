@@ -4,7 +4,7 @@ import type { ShipSpecs } from './ship';
 import type { Plan } from './planner';
 
 export const FARE_MIN = 80;
-export const FARE_MAX = 450;
+export const FARE_MAX = 600;
 export const FARE_STEP = 5;
 export const CREW_WAGE = 95;
 export const FOOD_PER_GUEST = 38;
@@ -17,6 +17,8 @@ export interface PlanSummary {
   idleDays: number;
   /** Most rival guests ashore at any one call. Premium guests mind crowds. */
   crowd?: number;
+  /** Price per tonne, when emissions rules change it from the region's usual price. */
+  fuelPrice?: number;
 }
 
 export interface Market { rep: number; demandBonus: number }
@@ -25,6 +27,14 @@ export interface Finance {
   mass: number; premium: number; booked: number; bookedMass: number; bookedPremium: number; occ: number;
   rev: number; onboard: number; crew: number; lease: number; food: number; fuel: number; ports: number;
   fees: number; cost: number; profit: number;
+}
+
+/** Low-sulfur fuel costs more; LNG costs less; a scrubber lets the ship burn ordinary fuel. */
+export function fuelPriceFor(region: Region, mode: string | null): number {
+  if (!region.eca || !mode) return region.fuelPrice;
+  if (mode === 'lowSulfur') return region.eca.lowSulfurPrice;
+  if (mode === 'lng') return region.eca.lngPrice;
+  return region.fuelPrice;
 }
 
 export function summarise(plan: Plan, idleDays = 0): PlanSummary {
@@ -38,20 +48,27 @@ export function summarise(plan: Plan, idleDays = 0): PlanSummary {
       return { callFee: p.callFee, headTax: p.headTax, tenderFee: tender ? (p.tenderFee ?? 2500) : 0, spend: p.spend };
     }),
     crowd: plan.calls.reduce((a, c) => Math.max(a, c.crowd), 0),
+    fuelPrice: fuelPriceFor(plan.input.region, plan.fuelMode),
   };
 }
 
 /** Two markets: mass guests shop on price, premium guests pay more for a better trip. */
-export function demand(region: Region, ship: Pick<ShipSpecs, 'luxury'>, p: Pick<PlanSummary, 'score' | 'nights' | 'seasonDemand' | 'crowd'>, fare: number, mk: Market) {
+/** Undercutting the rivals' fare wins mass bookings, but only so many: the market is finite. */
+export const MASS_UNDERCUT_CAP = 1.8;
+
+/** Premium guests avoid big ships: demand halves by about 1,800 berths. */
+export const sizeAversion = (pax: number) => 1 / (1 + Math.max(0, pax - 600) / 1200);
+
+export function demand(region: Region, ship: Pick<ShipSpecs, 'luxury' | 'pax'>, p: Pick<PlanSummary, 'score' | 'nights' | 'seasonDemand' | 'crowd'>, fare: number, mk: Market) {
   const m = region.market;
   const appealF = Math.pow(Math.max(p.score, 1) / 60, 1.4);
   const repF = Math.max(0.6, 1 + 0.1 * (mk.rep - 3)) * (1 + mk.demandBonus);
   const k = appealF * repF * p.seasonDemand * (NIGHTS_DEMAND[p.nights] ?? 0.8);
   const lux = Math.min(1.6, ship.luxury);
   const eff = fare / (1 + 0.35 * lux);
-  const mass = m.mass * k * Math.min(3, Math.exp(-(eff - m.rivalFare) / m.massSens));
+  const mass = m.mass * k * Math.min(MASS_UNDERCUT_CAP, Math.exp(-(eff - m.rivalFare) / m.massSens));
   const crowdF = 1 - Math.min(0.6, (p.crowd ?? 0) / 10000);
-  const premium = m.premium * k * crowdF * (0.6 + 0.5 * Math.min(1, lux)) * Math.min(2.5, Math.exp(-(eff - m.rivalFare) / m.premiumSens));
+  const premium = m.premium * k * crowdF * sizeAversion(ship.pax) * (0.6 + 0.5 * Math.min(1, lux)) * Math.min(2.5, Math.exp(-(eff - m.rivalFare) / m.premiumSens));
   return { mass, premium };
 }
 
@@ -66,7 +83,7 @@ export function finance(region: Region, ship: ShipSpecs, p: PlanSummary, fare: n
   const crew = ship.crew * CREW_WAGE * n;
   const lease = ship.lease * (n + p.idleDays);
   const food = booked * n * FOOD_PER_GUEST;
-  const fuel = Math.round(p.burned * region.fuelPrice);
+  const fuel = Math.round(p.burned * (p.fuelPrice ?? region.fuelPrice));
   const ports = p.calls.reduce((s, c) => s + c.callFee + c.headTax * booked + c.tenderFee, 0);
   const fees = p.tolls + p.pilotage;
   const cost = crew + lease + food + fuel + ports + fees;

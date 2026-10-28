@@ -1,17 +1,145 @@
 {
-  "branches": ["hull", "power", "hotel", "ops"],
+  "branches": [
+    "hull",
+    "power",
+    "hotel",
+    "ops"
+  ],
   "nodes": [
-    { "id": "bilge", "branch": "hull", "tier": 1, "cost": 2, "effect": { "roll": 0.8, "gale": 0.7 } },
-    { "id": "bulb", "branch": "hull", "tier": 1, "cost": 2, "effect": { "burn": 0.92 } },
-    { "id": "fins", "branch": "hull", "tier": 2, "cost": 4, "effect": { "roll": 0.6, "gale": 0.5 } },
-    { "id": "biggen", "branch": "power", "tier": 1, "cost": 2, "unlocks": ["GE2"] },
-    { "id": "shore", "branch": "power", "tier": 1, "cost": 2, "effect": { "portHotel": 0.5 } },
-    { "id": "azipod", "branch": "power", "tier": 2, "cost": 4, "effect": { "slowBurn": 0.85 } },
-    { "id": "specialty", "branch": "hotel", "tier": 1, "cost": 2, "unlocks": ["SD"] },
-    { "id": "lounge", "branch": "hotel", "tier": 1, "cost": 2, "unlocks": ["OBS"] },
-    { "id": "slide", "branch": "hotel", "tier": 2, "cost": 3, "unlocks": ["WS"] },
-    { "id": "bigboats", "branch": "ops", "tier": 1, "cost": 2, "unlocks": ["LB2"] },
-    { "id": "freezer", "branch": "ops", "tier": 1, "cost": 2, "effect": { "provisions": 1.5 } },
-    { "id": "tendergarage", "branch": "ops", "tier": 2, "cost": 3, "effect": { "tenderPenalty": 0, "tenderCancel": 0.5 } }
+    {
+      "id": "bilge",
+      "branch": "hull",
+      "tier": 1,
+      "cost": 2,
+      "effect": {
+        "roll": 0.8,
+        "gale": 0.7
+      }
+    },
+    {
+      "id": "bulb",
+      "branch": "hull",
+      "tier": 1,
+      "cost": 2,
+      "effect": {
+        "burn": 0.92
+      }
+    },
+    {
+      "id": "fins",
+      "branch": "hull",
+      "tier": 2,
+      "cost": 4,
+      "effect": {
+        "roll": 0.6,
+        "gale": 0.5
+      }
+    },
+    {
+      "id": "biggen",
+      "branch": "power",
+      "tier": 1,
+      "cost": 2,
+      "unlocks": [
+        "GE2"
+      ]
+    },
+    {
+      "id": "shore",
+      "branch": "power",
+      "tier": 1,
+      "cost": 2,
+      "effect": {
+        "portHotel": 0.5
+      }
+    },
+    {
+      "id": "azipod",
+      "branch": "power",
+      "tier": 2,
+      "cost": 4,
+      "effect": {
+        "slowBurn": 0.85
+      }
+    },
+    {
+      "id": "specialty",
+      "branch": "hotel",
+      "tier": 1,
+      "cost": 2,
+      "unlocks": [
+        "SD"
+      ]
+    },
+    {
+      "id": "lounge",
+      "branch": "hotel",
+      "tier": 1,
+      "cost": 2,
+      "unlocks": [
+        "OBS"
+      ]
+    },
+    {
+      "id": "slide",
+      "branch": "hotel",
+      "tier": 2,
+      "cost": 3,
+      "unlocks": [
+        "WS"
+      ]
+    },
+    {
+      "id": "bigboats",
+      "branch": "ops",
+      "tier": 1,
+      "cost": 2,
+      "unlocks": [
+        "LB2"
+      ]
+    },
+    {
+      "id": "freezer",
+      "branch": "ops",
+      "tier": 1,
+      "cost": 2,
+      "effect": {
+        "provisions": 1.5
+      }
+    },
+    {
+      "id": "tendergarage",
+      "branch": "ops",
+      "tier": 2,
+      "cost": 3,
+      "effect": {
+        "tenderPenalty": 0,
+        "tenderCancel": 0.5
+      }
+    },
+    {
+      "id": "icebelt",
+      "branch": "hull",
+      "tier": 2,
+      "cost": 3
+    },
+    {
+      "id": "scrubber",
+      "branch": "power",
+      "tier": 2,
+      "cost": 3,
+      "unlocks": [
+        "SCR"
+      ]
+    },
+    {
+      "id": "lng",
+      "branch": "power",
+      "tier": 3,
+      "cost": 4,
+      "unlocks": [
+        "LNG"
+      ]
+    }
   ]
 }

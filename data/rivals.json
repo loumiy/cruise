@@ -1,17 +1,171 @@
 {
-  "lines": {
-    "azure": { "name": "Azure Wave", "style": "big and cheap" },
-    "tradewind": { "name": "Tradewind Line", "style": "plays the islands" },
-    "coral": { "name": "Coral Crown", "style": "chases premium guests" }
+ "lines": {
+  "azure": {
+   "name": "Azure Wave",
+   "style": "big and cheap"
   },
-  "caribbean": [
-    { "ship": "Azure Majesty", "line": "azure", "guests": 4200, "calls": { "1": "CZM", "2": "GCM", "3": "OCJ" } },
-    { "ship": "Azure Horizon", "line": "azure", "guests": 3800, "calls": { "1": "NAS", "3": "STT", "4": "SXM" } },
-    { "ship": "Azure Glory", "line": "azure", "guests": 4000, "calls": { "1": "RTB", "2": "CMA", "3": "CZM" } },
-    { "ship": "Azure Sun", "line": "azure", "guests": 3200, "calls": { "0": "NAS", "2": "EYW", "3": "OCJ" } },
-    { "ship": "Trade Spirit", "line": "tradewind", "guests": 1800, "calls": { "0": "STT", "1": "SXM", "2": "ANU", "3": "SLU", "4": "BGI" } },
-    { "ship": "Island Song", "line": "tradewind", "guests": 2000, "calls": { "1": "SLU", "2": "ANU", "3": "SXM", "4": "STT", "5": "SJU" } },
-    { "ship": "Sea Breeze", "line": "tradewind", "guests": 2600, "calls": { "2": "NAS", "4": "AMB", "5": "SJU" } },
-    { "ship": "Crown Jewel", "line": "coral", "guests": 900, "calls": { "1": "CUR", "2": "AUA", "4": "CTG", "5": "COL" } }
-  ]
+  "tradewind": {
+   "name": "Tradewind Line",
+   "style": "plays the islands"
+  },
+  "coral": {
+   "name": "Coral Crown",
+   "style": "chases premium guests"
+  },
+  "glacier": {
+   "name": "Glacier Line",
+   "style": "big ships, short trips"
+  }
+ },
+ "caribbean": [
+  {
+   "ship": "Azure Majesty",
+   "line": "azure",
+   "guests": 4200,
+   "calls": {
+    "1": "CZM",
+    "2": "GCM",
+    "3": "OCJ"
+   }
+  },
+  {
+   "ship": "Azure Horizon",
+   "line": "azure",
+   "guests": 3800,
+   "calls": {
+    "1": "NAS",
+    "3": "STT",
+    "4": "SXM"
+   }
+  },
+  {
+   "ship": "Azure Glory",
+   "line": "azure",
+   "guests": 4000,
+   "calls": {
+    "1": "RTB",
+    "2": "CMA",
+    "3": "CZM"
+   }
+  },
+  {
+   "ship": "Azure Sun",
+   "line": "azure",
+   "guests": 3200,
+   "calls": {
+    "0": "NAS",
+    "2": "EYW",
+    "3": "OCJ"
+   }
+  },
+  {
+   "ship": "Trade Spirit",
+   "line": "tradewind",
+   "guests": 1800,
+   "calls": {
+    "0": "STT",
+    "1": "SXM",
+    "2": "ANU",
+    "3": "SLU",
+    "4": "BGI"
+   }
+  },
+  {
+   "ship": "Island Song",
+   "line": "tradewind",
+   "guests": 2000,
+   "calls": {
+    "1": "SLU",
+    "2": "ANU",
+    "3": "SXM",
+    "4": "STT",
+    "5": "SJU"
+   }
+  },
+  {
+   "ship": "Sea Breeze",
+   "line": "tradewind",
+   "guests": 2600,
+   "calls": {
+    "2": "NAS",
+    "4": "AMB",
+    "5": "SJU"
+   }
+  },
+  {
+   "ship": "Crown Jewel",
+   "line": "coral",
+   "guests": 900,
+   "calls": {
+    "1": "CUR",
+    "2": "AUA",
+    "4": "CTG",
+    "5": "COL"
+   }
+  }
+ ],
+ "alaska": [
+  {
+   "ship": "Azure Aurora",
+   "line": "azure",
+   "guests": 4100,
+   "calls": {
+    "1": "JNU",
+    "2": "SGY",
+    "4": "KTN"
+   }
+  },
+  {
+   "ship": "Azure Tundra",
+   "line": "azure",
+   "guests": 3900,
+   "calls": {
+    "2": "JNU",
+    "3": "SGY",
+    "5": "KTN",
+    "6": "YYJ"
+   }
+  },
+  {
+   "ship": "Glacier Spirit",
+   "line": "glacier",
+   "guests": 2600,
+   "calls": {
+    "1": "KTN",
+    "2": "JNU",
+    "3": "SGY",
+    "4": "ISP"
+   }
+  },
+  {
+   "ship": "Glacier Dawn",
+   "line": "glacier",
+   "guests": 2400,
+   "calls": {
+    "2": "KTN",
+    "3": "JNU",
+    "4": "SGY"
+   }
+  },
+  {
+   "ship": "Crown Borealis",
+   "line": "coral",
+   "guests": 1100,
+   "calls": {
+    "2": "SIT",
+    "3": "JNU",
+    "5": "KTN"
+   }
+  },
+  {
+   "ship": "Trade Wind North",
+   "line": "tradewind",
+   "guests": 2000,
+   "calls": {
+    "1": "SGY",
+    "3": "KTN",
+    "4": "JNU"
+   }
+  }
+ ]
 }

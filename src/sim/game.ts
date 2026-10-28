@@ -7,8 +7,9 @@ import { seaTrial, type TrialResult, type TrialKind } from './trial';
 import { planVoyage, turnarounds, type Plan } from './planner';
 import { fairFare, finance, summarise, type Finance, type Market } from './economy';
 import { planSeed, rollEvents, type VoyageEvent } from './events';
-import { canBuy, dpSpent, techMods, type TechMods } from './tech';
-import { nextOpenDay, seasonCloseDay, seasonOf } from './calendar';
+import { canBuy, dpSpent, techMods, blockUnlocked, type TechMods } from './tech';
+import { nextOpenDay, seasonCloseDay, seasonOf, dateOf } from './calendar';
+import { hashString, mulberry } from './geo';
 import { checkCrossing, type CrossingCheck } from './crossing';
 import type { Vars } from './strings';
 
@@ -23,6 +24,10 @@ export const MAX_WAIT = 6;
 export const ISLAND_LEASE = 1_500_000;
 /** Bookings at or above this count as "booked full" for milestones. */
 export const FULL_OCC = 0.95;
+/** Glacier Bay permits: weekly slots per season, and the range rivals bid in. */
+export const MAX_PERMITS = 2;
+export const PERMIT_BID_RANGE: [number, number] = [150000, 350000];
+const WILDLIFE = ['whales', 'calving', 'bears', 'eagles', 'iceberg'];
 
 export interface Blueprint {
   id: string; name: string; design: Design;
@@ -36,8 +41,18 @@ export interface LogEntry {
   n: number; day: number; region: string; season?: string; shipId: string; ship: string; route: string[]; nights: number;
   booked: number; pax: number; fare: number; profit: number; sat: number;
   events: { key: string; vars: Vars; good: boolean }[];
+  /** Fined for burning ordinary fuel in an emissions control area. */
+  fine?: boolean;
+  /** Wildlife sightings logged on the cruise. */
+  wild?: number;
 }
-export interface PlanDraft { shipId: string; nights: number; wait: number; stops: string[]; end: string; fare: number }
+export interface PlanDraft {
+  shipId: string; nights: number; wait: number; stops: string[]; end: string; fare: number;
+  /** In an emissions control area: buy low-sulfur fuel (default) or risk a fine. */
+  lowSulfur?: boolean;
+}
+/** A season's Glacier Bay permit result: weekly slots won, and whether a bid already went in. */
+export interface PermitRecord { slots: number; bid: number; rival: number; outbid?: boolean }
 
 export interface GameState {
   version: number;
@@ -53,6 +68,8 @@ export interface GameState {
   tutorial: { step: number; off: boolean };
   /** One-time prompts already shown for new mechanics. */
   hints: string[];
+  /** Glacier Bay permits by region and season year, e.g. "alaska:2029". */
+  permits: Record<string, PermitRecord>;
   seq: number;
 }
 
@@ -65,7 +82,7 @@ export function placedFrom(raw: StarterBlock[], prefix = 'b'): Placed[] {
   });
 }
 
-type StarterKey = 'puffin' | 'harbor' | 'crown' | 'majesty';
+type StarterKey = 'puffin' | 'harbor' | 'crown' | 'majesty' | 'tern';
 const STARTERS = starters as unknown as Record<StarterKey, { name: string; hull: string; blocks: StarterBlock[] }>;
 
 function starter(key: StarterKey): Design {
@@ -74,7 +91,7 @@ function starter(key: StarterKey): Design {
 }
 
 /** A hull unlock comes with a template design to start from. */
-const HULL_TEMPLATE: Record<string, StarterKey> = { liner: 'crown', mega: 'majesty' };
+const HULL_TEMPLATE: Record<string, StarterKey> = { liner: 'crown', mega: 'majesty', expedition: 'tern' };
 
 function addTemplate(s: GameState, hull: string): void {
   const key = HULL_TEMPLATE[hull];
@@ -83,7 +100,7 @@ function addTemplate(s: GameState, hull: string): void {
 }
 
 export function cloneDesign(d: Design): Design {
-  return { hull: d.hull, blocks: d.blocks.map(b => ({ ...b })) };
+  return { hull: d.hull, blocks: d.blocks.map(b => ({ ...b })), ...(d.options ? { options: { ...d.options } } : {}) };
 }
 
 export function newGame(mode: 'campaign' | 'sandbox' = 'campaign'): GameState {
@@ -104,6 +121,7 @@ export function newGame(mode: 'campaign' | 'sandbox' = 'campaign'): GameState {
     plan: { shipId: 's1', nights: 4, wait: 0, stops: [], end: 'BOS', fare: 400 },
     tutorial: { step: 0, off: sandbox },
     hints: [],
+    permits: {},
     seq: 10,
   };
   // The Puffin's trial is on file, so it can be copied and refit straight away.
@@ -122,7 +140,8 @@ export function nextId(s: GameState, prefix: string): string {
 export const isSandbox = (s: GameState) => s.mode === 'sandbox';
 export const regionOf = (s: GameState): Region => REGIONS[s.region];
 export const mods = (s: GameState): TechMods => techMods(s.tech);
-export const dpAvailable = (s: GameState) => s.dpEarned - dpSpent(s.tech);
+/** Sandbox owns every part without spending points, so it never counts below zero. */
+export const dpAvailable = (s: GameState) => isSandbox(s) ? 0 : Math.max(0, s.dpEarned - dpSpent(s.tech));
 export const shipById = (s: GameState, id: string) => s.ships.find(x => x.id === id);
 export const bpById = (s: GameState, id: string) => s.blueprints.find(x => x.id === id);
 
@@ -175,6 +194,9 @@ export type Check = { ok: true } | { ok: false; key: string; vars?: Vars };
 
 export function canCommission(s: GameState, bp: Blueprint): Check {
   if (!s.unlocked.hulls.includes(bp.design.hull)) return { ok: false, key: 'drydock.commission.hullLocked' };
+  const locked = bp.design.blocks.find(b => !blockUnlocked(b.type, s.tech, isSandbox(s)));
+  if (locked) return { ok: false, key: 'drydock.commission.techLocked', vars: { name: '@block.' + locked.type + '.name' } };
+  if (bp.design.options?.ice && !HULLS[bp.design.hull].ice && !isSandbox(s) && !s.tech.includes('icebelt')) return { ok: false, key: 'drydock.commission.iceLocked' };
   if (report(s, bp.design).errors) return { ok: false, key: 'drydock.commission.inspection' };
   if (trialStatus(s, bp) !== 'passed') return { ok: false, key: 'drydock.commission.trial' };
   const cost = commissionCost(s, bp.design);
@@ -237,17 +259,80 @@ export function refit(s: GameState, shipId: string): Check {
 
 // ---------- Chartroom ----------
 
-export function openGroups(s: GameState): string[] {
-  return s.unlocked.portGroups;
+export function openGroups(s: GameState, day?: number): string[] {
+  const g = [...s.unlocked.portGroups];
+  if (day != null && permitSlots(s, day) > 0) g.push('permit');
+  return g;
 }
 
 export function draftPlan(s: GameState, draft: PlanDraft = s.plan): Plan | null {
   const ship = shipById(s, draft.shipId);
   if (!ship) return null;
-  return planVoyage({
+  const departDay = ship.day + draft.wait;
+  const plan = planVoyage({
     region: regionOf(s), ship: specsOf(s, ship), start: ship.port, stops: draft.stops, end: draft.end,
-    nights: draft.nights, departDay: ship.day + draft.wait, openGroups: openGroups(s), sandbox: isSandbox(s), tech: mods(s),
+    nights: draft.nights, departDay, openGroups: openGroups(s, departDay), sandbox: isSandbox(s), tech: mods(s),
+    lowSulfur: draft.lowSulfur ?? true,
   });
+  // Permits are weekly: each slot covers one Glacier Bay call per week across the fleet.
+  const permitPorts = Object.keys(plan.input.region.ports).filter(id => plan.input.region.ports[id].lockedBy === 'permit');
+  for (const id of permitPorts) {
+    if (!draft.stops.includes(id) || isSandbox(s)) continue;
+    const slots = permitSlots(s, departDay);
+    if (slots > 0 && permitUsed(s, departDay, id) >= slots) {
+      plan.issues.push({ lvl: 'err', key: 'plan.permitUsed', vars: { port: plan.input.region.ports[id].name }, at: id });
+      plan.errors++;
+    }
+  }
+  return plan;
+}
+
+// ---------- Glacier permits ----------
+
+export const permitKey = (s: GameState, day: number) => s.region + ':' + dateOf(day).getUTCFullYear();
+
+export function permitSlots(s: GameState, day: number): number {
+  return s.permits?.[permitKey(s, day)]?.slots ?? 0;
+}
+
+/** Glacier Bay calls already planned into the same week by any ship in the fleet. */
+export function permitUsed(s: GameState, day: number, port: string): number {
+  const week = Math.floor(day / 7);
+  return s.log.filter(v => v.region === s.region && Math.floor(v.day / 7) === week && v.route.slice(1, -1).includes(port)).length;
+}
+
+/** The highest rival bid this season, from a fixed seed: the same season always has the same rival. */
+export function rivalBid(s: GameState, day: number): number {
+  const r = mulberry(hashString('permit:' + permitKey(s, day)));
+  const [lo, hi] = PERMIT_BID_RANGE;
+  return Math.round((lo + r() * (hi - lo)) / 5000) * 5000;
+}
+
+export function canBidPermit(s: GameState, day: number): Check {
+  const region = regionOf(s);
+  if (!Object.values(region.ports).some(p => p.lockedBy === 'permit')) return { ok: false, key: 'company.permit.none' };
+  const rec = s.permits?.[permitKey(s, day)];
+  if (rec && rec.slots >= MAX_PERMITS) return { ok: false, key: 'company.permit.max' };
+  if (rec?.outbid) return { ok: false, key: 'company.permit.lost' };
+  return { ok: true };
+}
+
+/** A sealed bid for one weekly slot this season. Pay only if you win. One losing bid ends the season's chances. */
+export function bidPermit(s: GameState, day: number, amount: number): { won: boolean; rival: number; milestones: string[] } | Check {
+  const c = canBidPermit(s, day);
+  if (!c.ok) return c;
+  if (!isSandbox(s) && s.cash < amount) return { ok: false, key: 'drydock.commission.cash', vars: { cost: amount } };
+  const key = permitKey(s, day);
+  s.permits ??= {};
+  const rec = s.permits[key] ?? { slots: 0, bid: 0, rival: 0 };
+  // Each extra slot this season costs a little more: rivals guard their share.
+  const rival = Math.round(rivalBid(s, day) * (1 + 0.25 * rec.slots));
+  const won = amount >= rival;
+  rec.bid = amount;
+  rec.rival = rival;
+  if (won) { rec.slots += 1; if (!isSandbox(s)) s.cash -= amount; } else rec.outbid = true;
+  s.permits[key] = rec;
+  return { won, rival, milestones: won ? checkMilestones(s) : [] };
 }
 
 export const market = (s: GameState): Market => ({ rep: s.rep, demandBonus: s.demandBonus });
@@ -308,6 +393,7 @@ export function sail(s: GameState): VoyageResult | null {
     route: [plan.input.start, ...plan.calls.map(c => c.id), plan.input.end], nights: plan.input.nights,
     booked: fin.booked, pax: plan.input.ship.pax, fare, profit, sat,
     events: events.map(e => ({ key: e.key, vars: e.vars, good: e.good })),
+    fine: events.some(e => e.id === 'ecaFine'), wild: events.filter(e => WILDLIFE.includes(e.id)).length,
   });
   if (s.log.length > 60) s.log.shift();
 
@@ -357,6 +443,20 @@ export function weekGuests(s: GameState, day: number): number {
     .reduce((a, v) => a + v.booked, 0);
 }
 
+/** A season (calendar year) in this region with at least `n` cruises and no emissions fines. */
+export function cleanSeason(s: GameState, n: number): boolean {
+  const years = new Map<number, { cruises: number; fines: number }>();
+  for (const v of s.log) {
+    if (v.region !== s.region) continue;
+    const y = dateOf(v.day).getUTCFullYear();
+    const rec = years.get(y) ?? { cruises: 0, fines: 0 };
+    rec.cruises++;
+    if (v.fine) rec.fines++;
+    years.set(y, rec);
+  }
+  return [...years.values()].some(r => r.cruises >= n && r.fines === 0);
+}
+
 export function checkMilestones(s: GameState, v: VoyageFacts = { profit: -Infinity, visited: [] }): string[] {
   const gained: string[] = [];
   const list = MILESTONES[s.region] ?? [];
@@ -374,7 +474,11 @@ export function checkMilestones(s: GameState, v: VoyageFacts = { profit: -Infini
         && (T.soldOutPax == null || (v.booked != null && v.pax != null && v.booked >= v.pax && v.booked >= T.soldOutPax))
         && (T.island == null || s.unlocked.portGroups.includes('island'))
         && (T.stormProfits == null || s.log.filter(x => x.region === s.region && x.season === 'hurricane' && x.profit > 0).length >= T.stormProfits)
-        && (T.weekGuests == null || (v.day != null && weekGuests(s, v.day) >= T.weekGuests));
+        && (T.weekGuests == null || (v.day != null && weekGuests(s, v.day) >= T.weekGuests))
+        && (T.visitAny == null || T.visitAny.some(p => v.visited.includes(p)))
+        && (T.permit == null || Object.entries(s.permits ?? {}).some(([k, r]) => k.startsWith(s.region + ':') && r.slots > 0))
+        && (T.wildlife == null || (s.log.length > 0 && s.log[s.log.length - 1].region === s.region && (s.log[s.log.length - 1].wild ?? 0) >= T.wildlife && v.day != null))
+        && (T.cleanSeason == null || cleanSeason(s, T.cleanSeason));
       if (!ok) continue;
       s.milestones.push(m.id);
       gained.push(m.id);
@@ -407,7 +511,7 @@ export function graduationOpen(s: GameState): boolean {
 
 export function crossingFor(s: GameState, ship: ShipRec): CrossingCheck {
   const g = regionOf(s).graduation!;
-  const c = checkCrossing(g, ship.port, specsOf(s, ship));
+  const c = checkCrossing(g, ship.port, specsOf(s, ship), regionOf(s).ports);
   if (ship.chartered) c.issues.unshift({ lvl: 'err', key: 'cross.chartered' }), c.ok = false;
   return c;
 }
@@ -443,7 +547,9 @@ export function graduate(s: GameState, shipIds: string[]): GraduationResult | Ch
   s.rep = Math.round((s.rep + START_REP) / 2 * 10) / 10;
   s.region = g.toRegion!;
   earnFirst(s, 'crossing', res.firsts);
-  s.plan = { shipId: going[0].id, nights: 7, wait: 0, stops: [], end: g.toPort!, fare: 180 };
+  if (g.unlockHull && !s.unlocked.hulls.includes(g.unlockHull)) { s.unlocked.hulls.push(g.unlockHull); addTemplate(s, g.unlockHull); }
+  for (const sh of going) if (!seasonOf(REGIONS[g.toRegion!], sh.day)) sh.day = nextOpenDay(REGIONS[g.toRegion!], sh.day);
+  s.plan = { shipId: going[0].id, nights: 7, wait: 0, stops: [], end: g.toPort!, fare: 180, lowSulfur: true };
   res.cashAfter = s.cash;
   res.repAfter = s.rep;
   return res;

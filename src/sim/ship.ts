@@ -4,7 +4,11 @@ import { NO_TECH, type TechMods } from './tech';
 import type { Vars } from './strings';
 
 export interface Placed { uid: string; type: string; deck: number; c: number; r: number; w: number; h: number }
-export interface Design { hull: string; blocks: Placed[] }
+export interface Design { hull: string; blocks: Placed[]; options?: { ice?: boolean } }
+
+/** An ice belt fitted to a hull that wasn't built with one: weight low in the hull, and a cost. */
+export const ICE_BELT_SHARE = 0.06;
+export const ICE_BELT_COST = 250000;
 
 export type Level = 'err' | 'warn';
 export interface Issue { lvl: Level; key: string; vars?: Vars; uids: string[]; deck: number | null }
@@ -16,6 +20,12 @@ export interface ShipSpecs {
   gm: number; listDeg: number; rollK: number; galeK: number;
   shipSat: number; spend: number; luxury: number; scenic: number; lease: number;
   souls: number; fitOut: number;
+  /** Can approach glacier faces through ice. */
+  ice: boolean;
+  /** Exhaust is clean enough for an emissions control area without low-sulfur fuel. */
+  scrubber: boolean; lng: boolean;
+  /** Guests the zodiacs can land in a day. */
+  zodiacSeats: number;
 }
 
 export interface DesignReport {
@@ -130,7 +140,14 @@ export function analyse(design: Design, tech: TechMods = NO_TECH): DesignReport 
 
   let pax = 0, viewSum = 0, beds = 0, staff = 0, seats = 0, supply = hull.baseSupplyKw, demand = 0;
   let lifeboatSeats = 0, tanks = 0, provisions = 0, fsMoment = 0, scenic = 0, fitOut = 0;
+  let scrubber = false, lng = false, zodiacSeats = 0;
   let W = hull.lightship.weight, Mz = W * hull.lightship.kg, My = 0;
+  const ice = !!hull.ice || !!design.options?.ice;
+  if (design.options?.ice && !hull.ice) {
+    const w = hull.lightship.weight * ICE_BELT_SHARE;
+    W += w; Mz += w * Math.max(1, hull.decks[0].z - 2);
+    fitOut += ICE_BELT_COST;
+  }
   const cellW = hull.beam / hull.rows;
   const venueCount: Record<string, number> = {};
   for (const b of all) {
@@ -144,6 +161,9 @@ export function analyse(design: Design, tech: TechMods = NO_TECH): DesignReport 
     demand += t.kw ?? 0; supply += t.supply ?? 0; lifeboatSeats += t.souls ?? 0;
     tanks += t.tank ?? 0; provisions += t.provisions ?? 0; fsMoment += t.freeSurface ?? 0;
     scenic = Math.max(scenic, t.scenic ?? 0);
+    if (t.scrubber) scrubber = true;
+    if (t.lng) lng = true;
+    zodiacSeats += t.zodiac ?? 0;
     fitOut += t.cost;
     if (t.sat) venueCount[b.type] = (venueCount[b.type] ?? 0) + 1;
   }
@@ -234,7 +254,7 @@ export function analyse(design: Design, tech: TechMods = NO_TECH): DesignReport 
     hull: design.hull, pax, crew: crewNeed, draft: hull.draft, air: hull.airDraft, length: hull.length, beam: hull.beam,
     vmax: hull.vmax, burnPerNm: hull.burnPerNm * tech.burn, fuelCap, hotelTph, foodDays,
     gm, listDeg: listDeg ?? 0, rollK: hull.rollK * tech.roll, galeK: hull.galeK * tech.gale,
-    shipSat: sat, spend, luxury, scenic, lease: hull.leasePerNight, souls, fitOut,
+    shipSat: sat, spend, luxury, scenic, lease: hull.leasePerNight, souls, fitOut, ice, scrubber, lng, zodiacSeats,
   };
   return {
     issues, flags, errors, warnings: issues.length - errors,
@@ -262,7 +282,7 @@ export function fuelRange(s: Pick<ShipSpecs, 'fuelCap' | 'vmax' | 'burnPerNm' | 
 export function designHash(d: Design): string {
   const parts = d.blocks.map(b => [b.type, b.deck, b.c, b.r, b.w, b.h].join('|')).sort();
   let h = 2166136261;
-  const s = d.hull + '|' + parts.join(',');
+  const s = d.hull + (d.options?.ice ? '+ice' : '') + '|' + parts.join(',');
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0).toString(36);
 }
@@ -281,5 +301,6 @@ export function refitCost(from: Design, to: Design): number {
     const type = k.split('|')[0];
     changed += diff * (BLOCKS[type]?.cost ?? 0);
   }
+  if (!!from.options?.ice !== !!to.options?.ice && !HULLS[to.hull]?.ice) changed += ICE_BELT_COST;
   return Math.round(changed * 0.3);
 }

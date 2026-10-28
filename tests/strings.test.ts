@@ -56,6 +56,11 @@ describe('every string the code asks for exists', () => {
       need.push('region.' + r.id, 'chapter.' + r.id + '.intro');
       if (r.graduation) need.push(...['name', 'goal', 'reward'].map(k => 'milestone.' + r.graduation!.id + '.' + k));
       for (const p of Object.values(r.ports)) if (p.canalCall) need.push('canal.panama');
+      for (const p of Object.values(r.ports)) {
+        if (p.lockedBy) need.push('plan.port.locked.' + p.lockedBy);
+        if (p.berth !== 'pier') need.push('chart.tip.' + p.berth);
+      }
+      for (const e of r.edges) if (e[2]?.narrows) need.push('narrows.' + e[2].narrows);
     }
     for (const r of ['bottom', 'lower', 'middle', 'upper', 'top', 'boat', 'any']) need.push('role.' + r);
     for (const g of new Set(Object.values(BLOCKS).map(b => b.group))) if (g !== 'Fixed') need.push('drydock.group.' + g);

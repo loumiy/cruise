@@ -5,7 +5,7 @@ import {
   bpById, report, runTrial, trialStatus, commission, canCommission, commissionCost, refitQuote, canRefit, refit,
   newBlueprint, copyBlueprint, deleteBlueprint, regionOf, isSandbox, type Blueprint,
 } from '../sim/game';
-import { canPlace, cellsOf, decksFor, fixedBlocks, hullOf, inShape, fuelRange, GM_MIN, STAIR_REACH, SERVICE_SPEED, type Placed, type DesignReport } from '../sim/ship';
+import { canPlace, cellsOf, decksFor, fixedBlocks, hullOf, inShape, fuelRange, GM_MIN, STAIR_REACH, SERVICE_SPEED, ICE_BELT_COST, type Placed, type DesignReport } from '../sim/ship';
 import { typicalCruise } from '../sim/economy';
 import { blockUnlocked } from '../sim/tech';
 import { encodeBlueprint, decodeBlueprint } from '../sim/share';
@@ -112,12 +112,26 @@ export function drydock(app: App): Screen {
       '<button type="button" class="btn sm" data-act="copy">' + esc(t('drydock.copy')) + '</button>' +
       '<button type="button" class="btn sm" data-act="delete"' + (s.blueprints.length <= 1 ? ' disabled' : '') + '>' + esc(t('drydock.delete')) + '</button>' +
       '<button type="button" class="btn sm" data-act="share">' + esc(t('drydock.share')) + '</button>' +
-      '<button type="button" class="btn sm" data-act="import">' + esc(t('drydock.import')) + '</button></div>';
+      '<button type="button" class="btn sm" data-act="import">' + esc(t('drydock.import')) + '</button>' + iceToggle() + '</div>';
     const head = $('#ddHead', root)!;
     head.innerHTML = html;
     head.querySelector<HTMLSelectElement>('#bpSel')!.onchange = e => { app.ui.bpId = (e.target as HTMLSelectElement).value; selected = null; tool = null; render(); };
     head.querySelectorAll<HTMLButtonElement>('[data-act]').forEach(btn => btn.onclick = () => act(btn.dataset.act!));
     head.querySelectorAll<HTMLButtonElement>('[data-refit]').forEach(btn => btn.onclick = () => doRefit(btn.dataset.refit!));
+    head.querySelector<HTMLInputElement>('[data-ice]')?.addEventListener('change', e => {
+      const d = bp().design;
+      d.options = { ...d.options, ice: (e.target as HTMLInputElement).checked };
+      changed();
+    });
+  }
+
+  /** Ice belt: built into some hulls, a tech option for the rest. */
+  function iceToggle(): string {
+    const s = app.state, b = bp(), h = hull();
+    if (h.ice) return '<span class="trialtag ok" style="margin-left:auto">' + ICON.ok + ' ' + esc(t('drydock.iceBuiltIn')) + '</span>';
+    const can = isSandbox(s) || s.tech.includes('icebelt');
+    return '<label class="chk" style="margin-left:auto" title="' + esc(can ? t('drydock.iceTip', { cost: kmoney(ICE_BELT_COST) }) : t('drydock.techLocked', { tech: t('tech.icebelt.name') })) + '">' +
+      '<input type="checkbox" data-ice' + (b.design.options?.ice ? ' checked' : '') + (can ? '' : ' disabled') + '> ' + esc(t('drydock.iceBelt')) + '</label>';
   }
 
   function act(a: string) {

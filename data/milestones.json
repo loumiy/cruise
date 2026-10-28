@@ -102,5 +102,56 @@
     "demand": 0.1
    }
   }
+ ],
+ "alaska": [
+  {
+   "id": "firstGlacier",
+   "test": {
+    "visitAny": [
+     "GLB",
+     "HUB",
+     "TRA"
+    ]
+   },
+   "reward": {
+    "cash": 150000
+   }
+  },
+  {
+   "id": "permitHolder",
+   "test": {
+    "permit": true
+   },
+   "reward": {
+    "cash": 100000
+   }
+  },
+  {
+   "id": "cleanStack",
+   "test": {
+    "cleanSeason": 6
+   },
+   "reward": {
+    "demand": 0.05
+   }
+  },
+  {
+   "id": "wildlifeWeek",
+   "test": {
+    "wildlife": 3
+   },
+   "reward": {
+    "cash": 120000
+   }
+  },
+  {
+   "id": "northernLight",
+   "test": {
+    "rep": 4
+   },
+   "reward": {
+    "demand": 0.1
+   }
+  }
  ]
 }

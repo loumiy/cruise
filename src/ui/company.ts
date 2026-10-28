@@ -1,7 +1,9 @@
 // Company: cash, reputation, fleet, tech tree, milestones and firsts.
 import { t, tn } from '../sim/strings';
 import { FIRST_DP, MILESTONES, TECH, REGION_ORDER, REGIONS } from '../sim/data';
-import { dpAvailable, buyTech, specsOf, regionOf, refitQuote, isSandbox, bpById, canLeaseIsland, leaseIsland, moveRegion, ISLAND_LEASE } from '../sim/game';
+import { dpAvailable, buyTech, specsOf, regionOf, refitQuote, isSandbox, bpById, canLeaseIsland, leaseIsland, moveRegion, ISLAND_LEASE,
+  companyDay, permitKey, canBidPermit, bidPermit, MAX_PERMITS, PERMIT_BID_RANGE } from '../sim/game';
+import { dateOf } from '../sim/calendar';
 import { canBuy, tierOpen } from '../sim/tech';
 import { fmtDate } from '../sim/calendar';
 import { esc, money, kmoney, stars, ICON, el } from './dom';
@@ -18,7 +20,7 @@ export function company(app: App): Screen {
       '<button type="button" class="btn link" data-rename>' + esc(t('company.rename')) + '</button></div>' +
       '<div><span class="label">' + esc(t('ui.cash')) + '</span><span class="big">' + (isSandbox(s) ? '∞' : money(s.cash)) + '</span></div>' +
       '<div><span class="label">' + esc(t('ui.reputation')) + '</span><span class="big">' + s.rep.toFixed(1) + ' <span class="stars">' + stars(s.rep) + '</span></span></div>' +
-      '<div><span class="label">' + esc(t('company.dp')) + '</span><span class="big">' + dp + ' <span class="sub2">' + esc(t('company.dpEarned', { n: s.dpEarned })) + '</span></span></div>' +
+      '<div><span class="label">' + esc(t('company.dp')) + '</span><span class="big">' + (isSandbox(s) ? '∞' : dp + ' <span class="sub2">' + esc(t('company.dpEarned', { n: s.dpEarned })) + '</span>') + '</span></div>' +
       '<div><span class="label">' + esc(t('company.voyages')) + '</span><span class="big">' + s.voyages + '</span></div>' +
       '<div><span class="label">' + esc(t('company.mode')) + '</span><span class="big" style="font-size:1rem">' + esc(t('mode.' + s.mode)) + '</span></div></section>';
 
@@ -70,6 +72,21 @@ export function company(app: App): Screen {
           : '<button type="button" class="btn primary" data-lease' + (can.ok ? '' : ' disabled title="' + esc(t(can.key, can.vars ? { cost: money(ISLAND_LEASE) } : undefined)) + '"') + '>' + esc(t('company.island.lease', { cost: kmoney(ISLAND_LEASE) })) + '</button>') +
         '</div></div>';
     }
+    // Glacier permits: one sealed bid per season and slot.
+    const permitPort = Object.values(region.ports).find(p => p.lockedBy === 'permit');
+    if (permitPort) {
+      const day = companyDay(s), rec = s.permits?.[permitKey(s, day)];
+      const can = canBidPermit(s, day);
+      const year = dateOf(day).getUTCFullYear();
+      let status = rec?.slots ? t('company.permit.held', { n: rec.slots, max: MAX_PERMITS }) : t('company.permit.noneYet');
+      if (rec?.outbid) status = (rec.slots ? t('company.permit.held', { n: rec.slots, max: MAX_PERMITS }) + ' ' : '') + t('company.permit.outbid', { rival: money(rec.rival) });
+      h += '<div class="panel"><div class="label" style="margin-bottom:.4rem">' + esc(t('company.permit.title', { name: permitPort.name, year })) + '</div>' +
+        '<p class="hint" style="margin-bottom:.5rem">' + esc(t('company.permit.desc')) + '</p><div class="island">' +
+        '<span style="flex:1 1 12rem">' + (rec?.slots ? '<span class="good">' + ICON.ok + '</span> ' : '') + esc(status) + '</span>' +
+        (can.ok ? '<label class="chk">' + esc(t('company.permit.bid')) + ' $<input class="txt mono" type="number" data-bidamt min="0" step="5000" value="' + Math.round((PERMIT_BID_RANGE[0] + PERMIT_BID_RANGE[1]) / 2) + '" style="width:7.5rem"></label>' +
+          '<button type="button" class="btn primary" data-bid>' + esc(t('company.permit.submit')) + '</button>' : '') +
+        '</div></div>';
+    }
     if (isSandbox(s)) {
       h += '<div class="panel"><div class="label" style="margin-bottom:.4rem">' + esc(t('company.region')) + '</div><div class="seg">' +
         REGION_ORDER.map(id => '<button type="button" data-region="' + id + '" aria-pressed="' + (id === s.region) + '">' + esc(t('region.' + id)) + '</button>').join('') + '</div></div>';
@@ -106,6 +123,15 @@ export function company(app: App): Screen {
       if ('ok' in r) { if (!r.ok) app.toast(t(r.key)); return; }
       sound.good(app.settings);
       app.toast(t('company.island.done'), 'ok');
+      for (const m of r.milestones) app.toast(t('report.milestone', { name: t('milestone.' + m + '.name') }), 'ok');
+      app.commit();
+    });
+    root.querySelector<HTMLButtonElement>('[data-bid]')?.addEventListener('click', () => {
+      const amt = Math.max(0, Math.round(Number(root.querySelector<HTMLInputElement>('[data-bidamt]')!.value) || 0));
+      const r = bidPermit(s, companyDay(s), amt);
+      if ('ok' in r) { if (!r.ok) app.toast(t(r.key, r.vars ? { cost: money(Number(r.vars.cost)) } : undefined)); return; }
+      if (r.won) { sound.good(app.settings); app.toast(t('company.permit.won', { rival: money(r.rival) }), 'ok'); }
+      else { sound.red(app.settings); app.toast(t('company.permit.lostNow', { rival: money(r.rival) })); }
       for (const m of r.milestones) app.toast(t('report.milestone', { name: t('milestone.' + m + '.name') }), 'ok');
       app.commit();
     });

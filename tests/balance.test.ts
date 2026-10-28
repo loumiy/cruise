@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   newGame, draftPlan, planFinance, sail, runTrial, commission, specsOf, companyDay, seasonOver, layUp, market, regionOf,
-  graduate, crossingFor, canCommission, leaseIsland, canLeaseIsland, moveRegion, type GameState,
+  graduate, crossingFor, canCommission, leaseIsland, canLeaseIsland, moveRegion, bidPermit, canBidPermit, rivalBid, type GameState,
 } from '../src/sim/game';
 import { dayOf } from '../src/sim/calendar';
 import { bestFare, summarise } from '../src/sim/economy';
@@ -14,7 +14,7 @@ import { fixHarborLight } from './helpers';
 const REF_FILE = path.join(__dirname, 'reference-cruises.json');
 const TOLERANCE = 0.15;
 
-interface Ref { ship: 'puffin' | 'harbor' | 'crown' | 'majesty'; start: string; stops: string[]; end: string; nights: number; wait?: number; region?: string }
+interface Ref { ship: 'puffin' | 'harbor' | 'crown' | 'majesty' | 'tern'; start: string; stops: string[]; end: string; nights: number; wait?: number; region?: string }
 const REFERENCE: Record<string, Ref> = {
   'puffin · Bar Harbor + Halifax · 4n': { ship: 'puffin', start: 'BOS', stops: ['BHB', 'HFX'], end: 'BOS', nights: 4 },
   'puffin · Portland + Saint John · 4n': { ship: 'puffin', start: 'BOS', stops: ['PWM', 'SJB'], end: 'BOS', nights: 4 },
@@ -27,15 +27,19 @@ const REFERENCE: Record<string, Ref> = {
   'liner · Eastern Caribbean from Barbados · 6n': { ship: 'crown', region: 'caribbean', start: 'BGI', stops: ['SLU', 'ANU', 'SXM'], end: 'BGI', nights: 6, wait: 228 },
   'mega · Western Caribbean · 7n': { ship: 'majesty', region: 'caribbean', start: 'MIA', stops: ['CZM', 'GCM', 'OCJ'], end: 'MIA', nights: 7, wait: 228 },
   'mega · Eastern Caribbean from San Juan · 7n': { ship: 'majesty', region: 'caribbean', start: 'SJU', stops: ['STT', 'SXM', 'ANU', 'SLU', 'BGI'], end: 'SJU', nights: 7, wait: 228 },
+  'expedition · Misty Fjords to Seward · 7n': { ship: 'tern', region: 'alaska', start: 'YVR', stops: ['MIS', 'KTN', 'TRA', 'JNU'], end: 'SWD', nights: 7, wait: 763 },
+  'expedition · Inside Passage and Sitka · 7n': { ship: 'tern', region: 'alaska', start: 'YVR', stops: ['KTN', 'WRG', 'TRA', 'SIT'], end: 'SWD', nights: 7, wait: 763 },
+  'liner · Glacier Bay round trip · 7n': { ship: 'crown', region: 'alaska', start: 'YVR', stops: ['KTN', 'GLB', 'JNU'], end: 'YVR', nights: 7, wait: 763 },
+  'mega · Alaska round trip · 7n': { ship: 'majesty', region: 'alaska', start: 'YVR', stops: ['KTN', 'GLB', 'JNU'], end: 'YVR', nights: 7, wait: 763 },
 };
 
-const TEMPLATE = { crown: 'MS Northern Crown', majesty: 'MS Harbor Majesty' };
+const TEMPLATE = { crown: 'MS Northern Crown', majesty: 'MS Harbor Majesty', tern: 'MV Northern Tern' };
 
 function setup(ref: Ref): GameState {
-  if (ref.ship === 'crown' || ref.ship === 'majesty') {
+  if (ref.ship === 'crown' || ref.ship === 'majesty' || ref.ship === 'tern') {
     const s = newGame('sandbox');
     moveRegion(s, ref.region!);
-    s.unlocked.portGroups.push('island');
+    s.unlocked.portGroups.push('island', 'permit');
     const bp = s.blueprints.find(b => b.name === TEMPLATE[ref.ship as 'crown'])!;
     runTrial(s, bp.id);
     const r = commission(s, bp.id, ref.start);
@@ -93,6 +97,10 @@ describe('reference cruises', () => {
     expect(results['harbor · Bar Harbor + Halifax · 4n'].profit).toBeGreaterThan(results['puffin · Bar Harbor + Halifax · 4n'].profit * 1.5);
     expect(results['mega · Eastern Caribbean from San Juan · 7n'].profit).toBeGreaterThan(results['liner · Eastern Caribbean from Barbados · 6n'].profit);
   });
+  it('in Alaska small and nimble beats big: the Mega is the wrong tool', () => {
+    expect(results['mega · Alaska round trip · 7n'].profit).toBeLessThan(results['liner · Glacier Bay round trip · 7n'].profit);
+    expect(results['mega · Alaska round trip · 7n'].profit).toBeLessThan(results['expedition · Misty Fjords to Seward · 7n'].profit);
+  });
 });
 
 /** A simple player: picks the best legal cruise from a route list for whichever ship is free first. */
@@ -112,12 +120,19 @@ const CARIB_ROUTES: [string[], string, number][] = [
   [['SLU', 'ANU', 'STT'], 'SJU', 5], [['STT', 'SXM'], 'BGI', 5], [['AMB'], 'MIA', 4], [['NAS'], 'MIA', 3],
 ];
 
+const ALASKA_ROUTES: [string[], string, number][] = [
+  [['MIS', 'KTN', 'TRA', 'JNU'], 'SWD', 7], [['KTN', 'WRG', 'TRA', 'SIT'], 'SWD', 7], [['KTN', 'GLB', 'JNU'], 'YVR', 7],
+  [['KTN', 'JNU', 'GLB', 'HUB'], 'SWD', 7], [['YYJ', 'KTN', 'JNU'], 'SEA', 7], [['KTN', 'JNU'], 'YVR', 7],
+  [['HUB', 'GLB', 'JNU', 'KTN'], 'YVR', 7], [['HUB', 'SIT', 'TRA', 'KTN'], 'YVR', 7], [['HUB', 'JNU', 'MIS'], 'YVR', 7],
+  [['YYJ'], 'SEA', 3], [['YYJ', 'KTN'], 'YVR', 6],
+];
+
 function playOneCruise(s: GameState): boolean {
   const ship = s.ships.slice().sort((a, b) => a.day - b.day)[0];
   if (seasonOver(s, ship)) { layUp(s, ship.id); return false; }
   let best: { stops: string[]; end: string; nights: number; fare: number; profit: number } | null = null;
   let bestWait = 0;
-  for (const [stops, end, nights] of s.region === 'caribbean' ? CARIB_ROUTES : ROUTES) {
+  for (const [stops, end, nights] of s.region === 'caribbean' ? CARIB_ROUTES : s.region === 'alaska' ? ALASKA_ROUTES : ROUTES) {
     if (stops.includes(ship.port)) continue;
     for (let wait = 0; wait < (s.region === 'caribbean' ? 3 : 1); wait++) {
       Object.assign(s.plan, { shipId: ship.id, stops, end, nights, wait });
@@ -188,5 +203,45 @@ describe('chapter 2 goal: grow in the Caribbean and unlock the Mega', () => {
   });
   it('the reference day is in winter high season', () => {
     expect(dayOf(2028, 1, 19)).toBe(228);
+  });
+});
+
+describe('chapter 3 goal: a ship built for Alaska', () => {
+  it('after the canal, a player who builds Expedition ships and bids for permits earns the Alaska milestones', () => {
+    const s = newGame('sandbox');
+    s.mode = 'campaign';
+    s.tech = [];
+    s.region = 'caribbean';
+    s.cash = 3_000_000;
+    s.milestones.push('capital', 'miami', 'megaMarket');
+    const crown = s.blueprints.find(b => b.name === 'MS Northern Crown')!;
+    runTrial(s, crown.id);
+    const c = commission(s, crown.id, 'MIA');
+    if (!('ship' in c)) throw new Error('commission failed');
+    s.ships = [c.ship];
+    c.ship.day = dayOf(2028, 3, 1);
+    expect(crossingFor(s, c.ship).ok).toBe(true);
+    const g = graduate(s, [c.ship.id]);
+    expect('ships' in g).toBe(true);
+    const tern = s.blueprints.find(b => b.name === 'MV Northern Tern')!;
+    runTrial(s, tern.id);
+    let cruises = 0, worst = Infinity, turns = 0, lost = 0;
+    const start = companyDay(s), cash0 = s.cash;
+    while (turns++ < 500 && cruises < 40 && companyDay(s) < start + 2 * 365) {
+      if (canCommission(s, tern).ok && s.ships.length < 3 && s.cash > 1_500_000) commission(s, tern.id, 'YVR');
+      const day = companyDay(s);
+      if (canBidPermit(s, day).ok && s.cash > 800_000) {
+        const r = bidPermit(s, day, rivalBid(s, day) + 10000);
+        if ('won' in r && !r.won) lost++;
+      }
+      const before = s.cash;
+      if (playOneCruise(s)) { cruises++; worst = Math.min(worst, s.cash - before); }
+    }
+    console.log('Alaska:', cruises, 'cruises in 2 seasons, fleet', s.ships.map(x => x.name).join(', '), 'cash', Math.round(cash0 / 1000) + 'k →', Math.round(s.cash / 1000) + 'k, worst', Math.round(worst / 1000) + 'k, fines', s.log.filter(v => v.region === 'alaska' && v.fine).length, 'milestones', s.milestones.filter(m => ['firstGlacier', 'permitHolder', 'cleanStack', 'wildlifeWeek', 'northernLight'].includes(m)).join(','));
+    expect(s.cash).toBeGreaterThan(cash0);
+    expect(s.milestones).toContain('firstGlacier');
+    expect(s.milestones).toContain('permitHolder');
+    expect(s.milestones).toContain('cleanStack');
+    expect(lost).toBeLessThanOrEqual(2); // a second slot costs more than the first, so a flat bid can lose once a season
   });
 });

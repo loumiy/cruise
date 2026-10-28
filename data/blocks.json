@@ -23,5 +23,8 @@
   "LB2": { "code": "BOAT+", "w": 2, "h": 1, "cat": "safety", "group": "Access and safety", "roles": ["boat"], "outer": "all", "wt": 70, "souls": 150, "cost": 8000, "tech": "bigboats" },
   "EN":  { "code": "ENGINE ROOM", "w": 1, "h": 1, "cat": "machine", "group": "Fixed", "roles": [], "wt": 600, "noisy": true, "fixed": true, "cost": 0 },
   "FU":  { "code": "", "w": 1, "h": 1, "cat": "machine", "group": "Fixed", "roles": [], "wt": 40, "fixed": true, "cost": 0 },
-  "BR":  { "code": "BRIDGE", "w": 1, "h": 1, "cat": "access", "group": "Fixed", "roles": [], "wt": 150, "fixed": true, "cost": 0 }
+  "BR":  { "code": "BRIDGE", "w": 1, "h": 1, "cat": "access", "group": "Fixed", "roles": [], "wt": 150, "fixed": true, "cost": 0 },
+  "SCR": { "code": "SCRUB", "w": 2, "h": 1, "cat": "machine", "group": "Machinery", "roles": ["bottom"], "wt": 120, "kw": 150, "scrubber": 1, "cost": 30000, "tech": "scrubber" },
+  "LNG": { "code": "LNG", "w": 2, "h": 1, "cat": "machine", "group": "Machinery", "roles": ["bottom"], "wt": 260, "lng": 1, "tank": 1, "freeSurface": 200, "cost": 45000, "tech": "lng" },
+  "ZOD": { "code": "ZODIAC", "w": 2, "h": 1, "cat": "safety", "group": "Access and safety", "roles": ["boat"], "outer": "any", "wt": 40, "kw": 5, "zodiac": 60, "staff": 3, "cost": 7000 }
 }

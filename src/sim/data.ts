@@ -11,6 +11,9 @@ import neLanes from '../../data/lanes/northeast.json';
 import caRegion from '../../data/regions/caribbean.json';
 import caPorts from '../../data/ports/caribbean.json';
 import caLanes from '../../data/lanes/caribbean.json';
+import akRegion from '../../data/regions/alaska.json';
+import akPorts from '../../data/ports/alaska.json';
+import akLanes from '../../data/lanes/alaska.json';
 import rivalsJson from '../../data/rivals.json';
 
 export type Role = 'bottom' | 'lower' | 'middle' | 'upper' | 'top' | 'boat' | 'any';
@@ -22,6 +25,7 @@ export interface BlockType {
   kw?: number; pax?: number; view?: number; seats?: number; staff?: number; sat?: number; spend?: number;
   noisy?: boolean; freeSurface?: number; supply?: number; tank?: number; provisions?: number;
   souls?: number; beds?: number; outer?: 'any' | 'all'; scenic?: number; hi?: boolean;
+  scrubber?: number; lng?: number; zodiac?: number;
   fixed?: boolean; tech?: string;
 }
 
@@ -34,12 +38,15 @@ export interface Hull {
   lightship: { weight: number; kg: number }; km: number; rollK: number; galeK: number;
   baseSupplyKw: number; baseFuelT: number; tankT: number; baseCrew: number;
   leasePerNight: number; commissionFee: number; bridgeZ: number;
+  /** Built with an ice belt. */
+  ice?: boolean;
   decks: DeckDef[]; fixed: FixedDef[];
 }
 
 export interface Port {
   name: string; country: string; lon: number; lat: number; appeal: number[]; tags: string[];
-  berth: 'pier' | 'tender'; maxDraft?: number; maxLength?: number; maxBeam?: number; fuel?: boolean; turnaround?: boolean;
+  /** scenic: cruise past, no landing. landing: guests go ashore by zodiac. */
+  berth: 'pier' | 'tender' | 'scenic' | 'landing'; maxDraft?: number; maxLength?: number; maxBeam?: number; fuel?: boolean; turnaround?: boolean;
   callFee: number; headTax: number; tenderFee?: number; lockedBy?: string; closed?: boolean;
   /** Ship berths at the pier. Rivals fill them on set weekdays. */
   berths?: number;
@@ -50,12 +57,17 @@ export interface Port {
   spend?: number;
   /** Toll for a partial canal transit made as part of the call. */
   canalCall?: number;
+  /** Ice at the glacier face: only ice-belted ships get close. */
+  ice?: boolean;
   label: [number, number, string];
 }
 
 export interface EdgeOpts {
   canal?: string; maxDraft?: number; maxAir?: number; maxBeam?: number; toll?: number;
   via?: [number, number][]; scenic?: string; pilotage?: number;
+  /** Passable only near slack water: hours between slacks, window width in hours, phase offset in hours. */
+  tide?: { period: number; window: number; phase: number };
+  narrows?: string;
 }
 
 export interface SeasonDef { id: string; months: number[]; appealIdx: number; demand: number; galeOdds: number; fogOdds: number; storms?: number }
@@ -63,6 +75,11 @@ export interface SeasonDef { id: string; months: number[]; appealIdx: number; de
 export interface Graduation {
   id: string; locked?: boolean; toRegion?: string; toPort?: string; from?: string[]; nm?: Record<string, number>;
   speed?: number; swell?: number; requires?: string; grant?: number; keepCash?: number;
+  /** Longest leg with no fuel, when the passage has refuel stops on the way. */
+  legNm?: number;
+  /** Size limits on the way, e.g. canal locks and bridges. */
+  limits?: { maxAir?: number; maxBeam?: number; maxLength?: number };
+  unlockHull?: string;
 }
 
 export interface Rival { ship: string; line: string; guests: number; calls: Record<string, string> }
@@ -75,6 +92,8 @@ export interface Region {
   fuelPrice: number; scenicBonus: number;
   /** Air conditioning: multiplies hotel fuel use. */
   hotelMult?: number;
+  /** Emissions control area: burn low-sulfur fuel, fit a scrubber or LNG, or risk a fine. */
+  eca?: { lowSulfurPrice: number; lngPrice: number; fine: number; fineOdds: number };
   soundings?: { shallow: [number, number]; deep: [number, number]; deepBox?: [number, number, number, number] };
   graduation?: Graduation;
   stormNames?: string[];
@@ -107,6 +126,7 @@ export interface MilestoneDef {
   test: {
     voyages?: number; visit?: string; profit?: number; cash?: number; rep?: number;
     regionVoyages?: number; soldOutPax?: number; island?: boolean; stormProfits?: number; weekGuests?: number;
+    visitAny?: string[]; permit?: boolean; wildlife?: number; cleanSeason?: number;
   };
   reward: { cash?: number; unlock?: string; unlockPorts?: string; unlockHull?: string; demand?: number };
 }
@@ -135,7 +155,8 @@ function region(r: unknown, ports: unknown, lanes: { edges: unknown; canals: unk
 export const REGIONS: Record<string, Region> = {
   northeast: region(neRegion, nePorts, neLanes),
   caribbean: region(caRegion, caPorts, caLanes),
+  alaska: region(akRegion, akPorts, akLanes),
 };
 
-export const REGION_ORDER = ['northeast', 'caribbean'];
+export const REGION_ORDER = ['northeast', 'caribbean', 'alaska'];
 export const HULL_ORDER = ['coastal', 'liner', 'mega'];

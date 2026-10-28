@@ -23,7 +23,8 @@ export function encodeBlueprint(name: string, d: Design): string {
     const rot = b.w !== t.w || b.h !== t.h ? 1 : 0;
     return b.type + ',' + b.deck + ',' + b.c + ',' + b.r + (rot ? ',1' : '');
   });
-  return PREFIX + toBase64Url(JSON.stringify([d.hull, name.slice(0, 40), rows.join(';')]));
+  const hull = d.hull + (d.options?.ice ? '+ice' : '');
+  return PREFIX + toBase64Url(JSON.stringify([hull, name.slice(0, 40), rows.join(';')]));
 }
 
 /** Decode a share code. Blocks that don't fit are dropped rather than failing the whole code. */
@@ -33,9 +34,11 @@ export function decodeBlueprint(code: string): { name: string; design: Design; d
   let parsed: unknown;
   try { parsed = JSON.parse(fromBase64Url(c.slice(PREFIX.length))); } catch { return null; }
   if (!Array.isArray(parsed) || parsed.length !== 3) return null;
-  const [hull, name, rows] = parsed as [string, string, string];
+  const [hullTag, name, rows] = parsed as [string, string, string];
+  if (typeof hullTag !== 'string') return null;
+  const [hull, opt] = hullTag.split('+');
   if (!HULLS[hull] || typeof name !== 'string' || typeof rows !== 'string') return null;
-  const design: Design = { hull, blocks: [] };
+  const design: Design = { hull, blocks: [], ...(opt === 'ice' ? { options: { ice: true } } : {}) };
   let dropped = 0, i = 0;
   for (const row of rows ? rows.split(';') : []) {
     const [type, deck, cc, r, rot] = row.split(',');

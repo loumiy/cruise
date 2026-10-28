@@ -65,6 +65,11 @@ export const HINTS: Hint[] = [
   { id: 'crowd', screen: 'chartroom', when: a => planHas(a, 'plan.crowd') },
   { id: 'storm', screen: 'chartroom', when: a => planHas(a, 'plan.storm') },
   { id: 'island', screen: 'chartroom', target: '[data-tut="nav-company"]', when: a => canLeaseIsland(a.state).ok },
+  { id: 'eca', screen: 'chartroom', target: '[data-tut="fuel"]', when: a => !!regionOf(a.state).eca && !!document.querySelector('[data-tut="fuel"]') },
+  { id: 'permit', screen: 'chartroom', target: '[data-tut="nav-company"]', when: a => !!regionOf(a.state).eca && planHas(a, 'plan.port.locked.permit') },
+  { id: 'tide', screen: 'chartroom', when: a => planHas(a, 'plan.tideWait') || planHas(a, 'plan.outsideRoute') },
+  { id: 'zodiac', screen: 'chartroom', when: a => planHas(a, 'plan.noZodiacs') },
+  { id: 'ice', screen: 'chartroom', when: a => planHas(a, 'plan.noIce') },
 ];
 
 export class Tutorial {

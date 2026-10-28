@@ -5,9 +5,12 @@ import { nmBetween, type LonLat } from './geo';
 export interface Edge extends EdgeOpts { a: string; b: string; pts: LonLat[]; len: number }
 export interface Graph { edges: Edge[]; adj: Record<string, { to: string; e: Edge }[]> }
 export interface ShipSize { draft: number; air: number; beam: number }
+export interface TideGate { narrows: string; atNm: number; period: number; window: number; phase: number }
 export interface Route {
   ids: string[]; pts: LonLat[]; nm: number; tolls: number; pilotage: number;
   canals: string[]; scenic: string[];
+  /** Tide-timed narrows on the way, with the distance from the start where the ship reaches each. */
+  tides: TideGate[];
 }
 
 const cache = new Map<string, Graph>();
@@ -46,7 +49,7 @@ export function edgeBlock(e: Edge, s: ShipSize): EdgeBlock {
 }
 
 /** Shortest legal route between two ports for a ship of this size. */
-export function route(region: Region, a: string, b: string, s: ShipSize): Route | null {
+export function route(region: Region, a: string, b: string, s: ShipSize, opts: { avoidTide?: boolean } = {}): Route | null {
   if (a === b) return null;
   const g = graphOf(region);
   const dist: Record<string, number> = {}, prev: Record<string, string> = {}, pe: Record<string, Edge> = {};
@@ -63,6 +66,7 @@ export function route(region: Region, a: string, b: string, s: ShipSize): Route 
     if (region.ports[u] && u !== a) continue;
     for (const { to, e } of g.adj[u]) {
       if (edgeBlock(e, s)) continue;
+      if (opts.avoidTide && e.tide) continue;
       const nd = dist[u] + e.len;
       if (nd < dist[to]) { dist[to] = nd; prev[to] = u; pe[to] = e; }
     }
@@ -72,9 +76,12 @@ export function route(region: Region, a: string, b: string, s: ShipSize): Route 
   let c = b;
   while (c !== a) { es.unshift(pe[c]); c = prev[c]; ids.unshift(c); }
   let pts: LonLat[] = [coordOf(region, a)];
-  let tolls = 0, pilotage = 0;
+  let tolls = 0, pilotage = 0, run = 0;
   const canals: string[] = [], scenic: string[] = [];
+  const tides: TideGate[] = [];
   es.forEach((e, i) => {
+    if (e.tide) tides.push({ narrows: e.narrows ?? 'narrows', atNm: run + e.len / 2, ...e.tide });
+    run += e.len;
     const fwd = e.a === ids[i];
     const p = fwd ? e.pts : e.pts.slice().reverse();
     pts = pts.concat(p.slice(1));
@@ -83,7 +90,7 @@ export function route(region: Region, a: string, b: string, s: ShipSize): Route 
     if (e.canal && !canals.includes(e.canal)) canals.push(e.canal);
     if (e.scenic && !scenic.includes(e.scenic)) scenic.push(e.scenic);
   });
-  return { ids, pts, nm: dist[b], tolls, pilotage, canals, scenic };
+  return { ids, pts, nm: dist[b], tolls, pilotage, canals, scenic, tides };
 }
 
 /** Canals a ship is too big for, for the "sails around" hint. */

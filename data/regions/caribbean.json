@@ -1522,7 +1522,30 @@
  },
  "graduation": {
   "id": "panama",
-  "locked": true
+  "toRegion": "alaska",
+  "toPort": "SEA",
+  "from": [
+   "MIA",
+   "SJU",
+   "BGI"
+  ],
+  "nm": {
+   "MIA": 5600,
+   "SJU": 5900,
+   "BGI": 6200
+  },
+  "legNm": 1700,
+  "speed": 16,
+  "swell": 1.5,
+  "requires": "megaMarket",
+  "grant": 600000,
+  "keepCash": 0.25,
+  "limits": {
+   "maxAir": 61.3,
+   "maxBeam": 51.25,
+   "maxLength": 366
+  },
+  "unlockHull": "expedition"
  },
  "stormNames": [
   "Ana",

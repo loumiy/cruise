@@ -66,10 +66,10 @@
   "liner · Eastern Caribbean from Barbados · 6n": {
     "errors": [],
     "appeal": 64,
-    "fare": 170,
+    "fare": 165,
     "booked": 898,
     "fuel": 110,
-    "profit": 417577
+    "profit": 390637
   },
   "mega · Western Caribbean · 7n": {
     "errors": [],
@@ -86,5 +86,37 @@
     "booked": 2212,
     "fuel": 296,
     "profit": 506866
+  },
+  "expedition · Misty Fjords to Seward · 7n": {
+    "errors": [],
+    "appeal": 76,
+    "fare": 545,
+    "booked": 240,
+    "fuel": 75,
+    "profit": 624136
+  },
+  "expedition · Inside Passage and Sitka · 7n": {
+    "errors": [],
+    "appeal": 76,
+    "fare": 540,
+    "booked": 240,
+    "fuel": 72,
+    "profit": 617003
+  },
+  "liner · Glacier Bay round trip · 7n": {
+    "errors": [],
+    "appeal": 66,
+    "fare": 260,
+    "booked": 898,
+    "fuel": 178,
+    "profit": 965333
+  },
+  "mega · Alaska round trip · 7n": {
+    "errors": [],
+    "appeal": 66,
+    "fare": 230,
+    "booked": 1405,
+    "fuel": 359,
+    "profit": 269418
   }
 }

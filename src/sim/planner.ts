@@ -1,7 +1,7 @@
 // The Chartroom planner: schedule, speed, fuel, port rules, the PVSA and appeal.
 import type { Port, Region, Rival, SeasonDef } from './data';
 import type { ShipSpecs } from './ship';
-import { route, type Route } from './route';
+import { route, type Route, type TideGate } from './route';
 import { seasonOf, seasonCloseDay, weekdayOf } from './calendar';
 import { forecastHit } from './storms';
 import { NO_TECH, type TechMods } from './tech';
@@ -14,6 +14,23 @@ export const MIN_STAY = 8;
 export const MIN_SPEED = 10;
 export const FUEL_RESERVE = 0.15;
 export const NIGHT_OPTIONS = [3, 4, 5, 6, 7];
+/** Scenic stops: cruise past in daylight for a few hours. */
+export const SCENIC_STAY = 4;
+export const DAYLIGHT = [6, 16];
+/** Each zodiac seat makes about six landings a day. */
+export const ZODIAC_TRIPS = 6;
+/** Without an ice belt a ship stays back from the glacier face. */
+export const NO_ICE_PENALTY = 4;
+
+export type FuelMode = 'standard' | 'lowSulfur' | 'scrubber' | 'lng';
+
+/** Hours to wait before a tide gate opens, if the ship arrives at `absHour` (hours since day 0). */
+export function tideWait(g: Pick<TideGate, 'period' | 'window' | 'phase'>, absHour: number): number {
+  const x = ((absHour - g.phase) % g.period + g.period) % g.period;
+  const half = g.window / 2;
+  if (x <= half || x >= g.period - half) return 0;
+  return g.period - half - x;
+}
 
 export interface PlanInput {
   region: Region;
@@ -26,12 +43,14 @@ export interface PlanInput {
   openGroups: string[];
   sandbox?: boolean;
   tech?: TechMods;
+  /** In an emissions control area, without a scrubber or LNG: pay for low-sulfur fuel, or risk a fine. */
+  lowSulfur?: boolean;
 }
 
 export type PlanLevel = 'err' | 'warn' | 'info';
 export interface PlanIssue { lvl: PlanLevel; key: string; vars?: Vars; at?: string }
 
-export interface Leg { from: string; to: string; r: Route; dep: number; arr: number; speed: number; sailH: number; idleH: number; fuel: number }
+export interface Leg { from: string; to: string; r: Route; dep: number; arr: number; speed: number; sailH: number; idleH: number; fuel: number; tideWait: number }
 export interface Call {
   id: string; arr: number; dep: number; refuel: boolean;
   /** 0 = Sunday. */
@@ -41,6 +60,8 @@ export interface Call {
   crowd: number;
   /** Piers were full, so the ship anchors and tenders. */
   tender: boolean;
+  /** A scenic stop: cruise past, nobody goes ashore. */
+  scenic: boolean;
 }
 
 /** Rival ships calling at a port on a weekday. */
@@ -66,6 +87,8 @@ export interface Plan {
   fuelPts: [number, number][]; minFuel: number; minFuelAt: string | null; burned: number;
   tolls: number; pilotage: number; canals: string[]; scenic: string[];
   seaDays: number; nm: number;
+  /** How the ship meets emissions rules, when the region has them. */
+  fuelMode: FuelMode | null;
   score: number; parts: { key: string; vars?: Vars; v: number }[]; tags: string[];
   issues: PlanIssue[]; broken: boolean; errors: number; warnings: number;
 }
@@ -76,11 +99,11 @@ export function portStatus(region: Region, id: string, ship: Pick<ShipSpecs, 'dr
   const p = region.ports[id];
   if (!p) return { ok: false, key: 'plan.port.unknown' };
   if (p.closed) return { ok: false, key: 'plan.port.closed', vars: { port: p.name } };
-  if (p.lockedBy && !sandbox && !openGroups.includes(p.lockedBy)) return { ok: false, key: 'plan.port.locked', vars: { port: p.name }, locked: true };
+  if (p.lockedBy && !sandbox && !openGroups.includes(p.lockedBy)) return { ok: false, key: 'plan.port.locked.' + p.lockedBy, vars: { port: p.name }, locked: true };
   if (p.berth === 'pier' && p.maxDraft != null && ship.draft > p.maxDraft) {
     return { ok: false, key: 'plan.port.tooDeep', vars: { port: p.name, max: p.maxDraft, draft: ship.draft } };
   }
-  if (p.berth === 'pier' && p.maxLength != null && ship.length > p.maxLength) {
+  if ((p.berth === 'pier' || p.berth === 'scenic') && p.maxLength != null && ship.length > p.maxLength) {
     return { ok: false, key: 'plan.port.tooLong', vars: { port: p.name, max: p.maxLength, len: ship.length } };
   }
   if (p.maxBeam != null && ship.beam != null && ship.beam > p.maxBeam) {
@@ -121,29 +144,53 @@ export function planVoyage(input: PlanInput): Plan {
   for (let i = 0; input.stops.length && i < seq.length - 1; i++) {
     const a = seq[i], b = seq[i + 1], last = i === seq.length - 2;
     if (a === b) { E('plan.twoInRow', { port: P[b].name }, b); broken = true; break; }
-    const r = route(region, a, b, size);
+    // A tide-timed narrows can hold the ship for hours. Take the outside route if that gets there sooner.
+    const startAbs = input.departDay * 24 + t;
+    const waitOn = (rt: Route, speed: number) => rt.tides.reduce((w, g) => w + tideWait(g, startAbs + w + g.atNm / speed), 0);
+    let r = route(region, a, b, size);
+    if (r?.tides.length) {
+      const alt = route(region, a, b, size, { avoidTide: true });
+      if (alt && alt.nm / ship.vmax < r.nm / ship.vmax + waitOn(r, ship.vmax)) {
+        I('plan.outsideRoute', { narrows: '@narrows.' + r.tides[0].narrows, nm: Math.round(alt.nm - r.nm) }, b);
+        r = alt;
+      }
+    }
     if (!r) { E('plan.noRoute', { from: P[a].name, to: P[b].name }, b); broken = true; break; }
     tolls += r.tolls; pilotage += r.pilotage; nm += r.nm;
     r.canals.forEach(c => { if (!canals.includes(c)) canals.push(c); });
     r.scenic.forEach(c => { if (!scenic.includes(c)) scenic.push(c); });
-    const earliest = t + r.nm / ship.vmax;
+    const scenicStop = !last && P[b].berth === 'scenic';
+    const earliest = t + r.nm / ship.vmax + waitOn(r, ship.vmax);
     let arr: number;
     if (last) arr = Math.max(earliest, deadline);
-    else {
+    else if (scenicStop) {
+      // Scenic stops happen in daylight, any time between 06:00 and 16:00.
+      const d = Math.floor(earliest / 24), tod = earliest - d * 24;
+      arr = tod < DAYLIGHT[0] ? d * 24 + DAYLIGHT[0] : tod <= DAYLIGHT[1] ? earliest : (d + 1) * 24 + DAYLIGHT[0];
+    } else {
       const d = Math.floor(earliest / 24), tod = earliest - d * 24;
       arr = tod <= ARRIVE_BY ? d * 24 + ARRIVE_BY : tod <= LATEST_ARRIVAL ? earliest : (d + 1) * 24 + ARRIVE_BY;
     }
-    // As slow as the schedule allows, because slower sailing burns less fuel.
-    let speed = r.nm / Math.max(0.01, arr - t);
-    speed = Math.min(ship.vmax, Math.max(Math.min(MIN_SPEED, ship.vmax), speed));
+    // As slow as the schedule allows, because slower sailing burns less fuel. A tide wait eats into the time.
+    const minV = Math.min(MIN_SPEED, ship.vmax);
+    let speed = r.nm / Math.max(0.01, arr - t), tw = 0;
+    for (let k = 0; k < 3; k++) {
+      speed = Math.min(ship.vmax, Math.max(minV, speed));
+      tw = waitOn(r, speed);
+      speed = r.nm / Math.max(0.01, arr - t - tw);
+    }
+    speed = Math.min(ship.vmax, Math.max(minV, speed));
+    tw = waitOn(r, speed);
+    if (last) arr = Math.max(arr, t + r.nm / speed + tw);
     const sailH = r.nm / speed, idleH = Math.max(0, arr - t - sailH);
     const slow = speed < ship.vmax * 0.75 ? tech.slowBurn : 1;
     const f = r.nm * ship.burnPerNm * slow * Math.pow(speed / ship.vmax, 2) + hotel * (sailH + idleH);
     fuel -= f; burned += f; fuelPts.push([arr, fuel]);
     if (fuel < minFuel) { minFuel = fuel; minFuelAt = b; }
-    legs.push({ from: a, to: b, r, dep: t, arr, speed, sailH, idleH, fuel: f });
+    legs.push({ from: a, to: b, r, dep: t, arr, speed, sailH, idleH, fuel: f, tideWait: tw });
+    if (tw > 0.3) I('plan.tideWait', { h: tw.toFixed(1), narrows: '@narrows.' + r.tides[0].narrows }, b);
     if (!last) {
-      const d = Math.floor(arr / 24), dep = Math.max(arr + MIN_STAY, d * 24 + DEPART_HOUR);
+      const d = Math.floor(arr / 24), dep = scenicStop ? arr + SCENIC_STAY : Math.max(arr + MIN_STAY, d * 24 + DEPART_HOUR);
       const pf = hotel * 0.6 * tech.portHotel * (dep - arr);
       fuel -= pf; burned += pf; fuelPts.push([dep, fuel]);
       if (fuel < minFuel) { minFuel = fuel; minFuelAt = b; }
@@ -152,7 +199,7 @@ export function planVoyage(input: PlanInput): Plan {
       const weekday = weekdayOf(input.departDay + Math.floor(arr / 24));
       const rivals = P[b].privateIsland ? [] : rivalsAt(region, b, weekday);
       const full = P[b].berths != null && rivals.length >= P[b].berths!;
-      calls.push({ id: b, arr, dep, refuel, weekday, rivals, crowd: rivals.reduce((a, r) => a + r.guests, 0), tender: full && !!P[b].tenderOk });
+      calls.push({ id: b, arr, dep, refuel: refuel && !scenicStop, weekday, rivals, crowd: rivals.reduce((a, r) => a + r.guests, 0), tender: full && !!P[b].tenderOk, scenic: scenicStop });
       if (P[b].canalCall) { tolls += P[b].canalCall!; if (!canals.includes('panama')) canals.push('panama'); }
       t = dep;
     } else t = arr;
@@ -195,6 +242,13 @@ export function planVoyage(input: PlanInput): Plan {
     if (c.crowd >= 6000) W('plan.crowd', { port: p.name, n: c.crowd.toLocaleString('en-US'), day }, c.id);
     const hit = forecastHit(region, [p.lon, p.lat], input.departDay + c.arr / 24, input.departDay);
     if (hit) W('plan.storm', { storm: hit.storm.name, port: p.name }, c.id);
+    if (p.berth === 'landing' && !ship.zodiacSeats) E('plan.noZodiacs', { port: p.name }, c.id);
+    if (p.ice && !ship.ice) I('plan.noIce', { port: p.name }, c.id);
+  }
+  let fuelMode: FuelMode | null = null;
+  if (region.eca) {
+    fuelMode = ship.lng ? 'lng' : ship.scrubber ? 'scrubber' : input.lowSulfur ? 'lowSulfur' : 'standard';
+    if (fuelMode === 'standard') W('plan.ecaRisk', { fine: '$' + Math.round(region.eca.fine / 1000) + 'k' });
   }
   canals.forEach(c => I('plan.canal', { canal: '@canal.' + c }));
 
@@ -206,7 +260,10 @@ export function planVoyage(input: PlanInput): Plan {
     if (done.has(c.id)) continue;
     done.add(c.id);
     const p = P[c.id];
-    const a = p.appeal[sIdx] - (p.berth === 'tender' || c.tender ? tech.tenderPenalty : 0);
+    let a = p.appeal[sIdx] - (p.berth === 'tender' || c.tender ? tech.tenderPenalty : 0);
+    if (p.ice && !ship.ice) a -= NO_ICE_PENALTY;
+    // A landing is only as good as the share of guests the zodiacs can take ashore.
+    if (p.berth === 'landing') a = Math.round(a * Math.min(1, ship.zodiacSeats * ZODIAC_TRIPS / Math.max(1, ship.pax)) * 10) / 10;
     raw += a; parts.push({ key: 'appeal.port', vars: { port: p.name }, v: a });
     const cp = crowdPenalty(c.crowd);
     if (cp) { raw -= cp; parts.push({ key: 'appeal.crowd', vars: { port: p.name }, v: -cp }); }
@@ -224,7 +281,7 @@ export function planVoyage(input: PlanInput): Plan {
   const errors = issues.filter(i => i.lvl === 'err').length;
   return {
     input, season, legs, calls, ret, deadline, fuelPts, minFuel, minFuelAt, burned,
-    tolls, pilotage, canals, scenic, seaDays, nm, score, parts, tags: [...tags],
+    tolls, pilotage, canals, scenic, seaDays, nm, fuelMode, score, parts, tags: [...tags],
     issues, broken, errors, warnings: issues.filter(i => i.lvl === 'warn').length,
   };
 }

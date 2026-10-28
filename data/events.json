@@ -1,9 +1,83 @@
 [
-  { "id": "fog", "on": "leg", "zone": "fog", "odds": "fogOdds", "sat": -2, "once": true },
-  { "id": "whales", "on": "leg", "zone": "whale", "odds": 0.38, "sat": 3, "once": true },
-  { "id": "gale", "on": "leg", "zone": "gale", "minNm": 150, "odds": "galeOdds", "sat": -10, "scaleByHull": true },
-  { "id": "tenderCancel", "on": "call", "berth": "tender", "odds": 0.22, "fallOdds": 0.3, "sat": -5, "refund": 40, "cancelsCall": true },
-  { "id": "iceberg", "on": "call", "port": "STJ", "season": "summer", "odds": 0.6, "sat": 4 },
-  { "id": "foliage", "on": "call", "tag": "foliage", "season": "fall", "odds": 0.5, "sat": 2, "revenue": 12 },
-  { "id": "excursions", "on": "call", "minAppeal": 9, "odds": 0.35, "sat": 2, "revenue": 10 }
+  {
+    "id": "fog",
+    "on": "leg",
+    "zone": "fog",
+    "odds": "fogOdds",
+    "sat": -2,
+    "once": true
+  },
+  {
+    "id": "whales",
+    "on": "leg",
+    "zone": "whale",
+    "odds": 0.38,
+    "sat": 3,
+    "once": true
+  },
+  {
+    "id": "gale",
+    "on": "leg",
+    "zone": "gale",
+    "minNm": 150,
+    "odds": "galeOdds",
+    "sat": -10,
+    "scaleByHull": true
+  },
+  {
+    "id": "tenderCancel",
+    "on": "call",
+    "berth": "tender",
+    "odds": 0.22,
+    "fallOdds": 0.3,
+    "sat": -5,
+    "refund": 40,
+    "cancelsCall": true
+  },
+  {
+    "id": "iceberg",
+    "on": "call",
+    "port": "STJ",
+    "season": "summer",
+    "odds": 0.6,
+    "sat": 4
+  },
+  {
+    "id": "foliage",
+    "on": "call",
+    "tag": "foliage",
+    "season": "fall",
+    "odds": 0.5,
+    "sat": 2,
+    "revenue": 12
+  },
+  {
+    "id": "excursions",
+    "on": "call",
+    "minAppeal": 9,
+    "odds": 0.35,
+    "sat": 2,
+    "revenue": 10
+  },
+  {
+    "id": "calving",
+    "on": "call",
+    "tag": "glaciers",
+    "odds": 0.6,
+    "sat": 4
+  },
+  {
+    "id": "bears",
+    "on": "call",
+    "tag": "bears",
+    "odds": 0.5,
+    "sat": 3
+  },
+  {
+    "id": "eagles",
+    "on": "call",
+    "tag": "bald eagles",
+    "odds": 0.6,
+    "sat": 2
+  }
 ]

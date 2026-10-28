@@ -1,0 +1,399 @@
+{
+ "SEA": {
+  "name": "Seattle",
+  "country": "US",
+  "lon": -122.37,
+  "lat": 47.6,
+  "appeal": [
+   7,
+   7
+  ],
+  "tags": [
+   "Pike Place",
+   "coffee"
+  ],
+  "berth": "pier",
+  "maxDraft": 12,
+  "maxLength": 370,
+  "fuel": true,
+  "turnaround": true,
+  "callFee": 2500,
+  "headTax": 28,
+  "berths": 4,
+  "label": [
+   -8,
+   4,
+   "end"
+  ]
+ },
+ "YVR": {
+  "name": "Vancouver",
+  "country": "CA",
+  "lon": -123.28,
+  "lat": 49.29,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "city",
+   "mountains"
+  ],
+  "berth": "pier",
+  "maxDraft": 12,
+  "maxLength": 360,
+  "fuel": true,
+  "turnaround": true,
+  "callFee": 2400,
+  "headTax": 24,
+  "berths": 3,
+  "label": [
+   -8,
+   -6,
+   "end"
+  ]
+ },
+ "YYJ": {
+  "name": "Victoria",
+  "country": "CA",
+  "lon": -123.37,
+  "lat": 48.41,
+  "appeal": [
+   7,
+   7
+  ],
+  "tags": [
+   "gardens",
+   "high tea"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 340,
+  "callFee": 1800,
+  "headTax": 15,
+  "berths": 3,
+  "label": [
+   -6,
+   14,
+   "end"
+  ]
+ },
+ "YPR": {
+  "name": "Prince Rupert",
+  "country": "CA",
+  "lon": -130.33,
+  "lat": 54.3,
+  "appeal": [
+   6,
+   6
+  ],
+  "tags": [
+   "First Nations art"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 320,
+  "fuel": true,
+  "callFee": 1600,
+  "headTax": 12,
+  "berths": 1,
+  "tenderOk": true,
+  "label": [
+   8,
+   4,
+   "start"
+  ]
+ },
+ "KTN": {
+  "name": "Ketchikan",
+  "country": "US",
+  "lon": -131.67,
+  "lat": 55.32,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "totem poles",
+   "salmon"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 340,
+  "callFee": 2000,
+  "headTax": 22,
+  "berths": 4,
+  "tenderOk": true,
+  "label": [
+   -8,
+   12,
+   "end"
+  ]
+ },
+ "MIS": {
+  "name": "Misty Fjords",
+  "country": "US",
+  "lon": -130.45,
+  "lat": 55.55,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "fjords",
+   "wildlife"
+  ],
+  "berth": "landing",
+  "callFee": 0,
+  "headTax": 8,
+  "label": [
+   8,
+   4,
+   "start"
+  ]
+ },
+ "WRG": {
+  "name": "Wrangell",
+  "country": "US",
+  "lon": -132.42,
+  "lat": 56.48,
+  "appeal": [
+   6,
+   6
+  ],
+  "tags": [
+   "Stikine River",
+   "petroglyphs"
+  ],
+  "berth": "pier",
+  "maxDraft": 9,
+  "maxLength": 200,
+  "callFee": 1200,
+  "headTax": 12,
+  "berths": 1,
+  "label": [
+   8,
+   4,
+   "start"
+  ]
+ },
+ "TRA": {
+  "name": "Tracy Arm",
+  "country": "US",
+  "lon": -133.72,
+  "lat": 57.86,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "fjords",
+   "glaciers"
+  ],
+  "berth": "scenic",
+  "maxLength": 300,
+  "callFee": 0,
+  "headTax": 0,
+  "label": [
+   8,
+   12,
+   "start"
+  ]
+ },
+ "JNU": {
+  "name": "Juneau",
+  "country": "US",
+  "lon": -134.42,
+  "lat": 58.29,
+  "appeal": [
+   9,
+   9
+  ],
+  "tags": [
+   "Mendenhall Glacier",
+   "whale watching"
+  ],
+  "berth": "pier",
+  "maxDraft": 12,
+  "maxLength": 360,
+  "fuel": true,
+  "callFee": 2200,
+  "headTax": 25,
+  "berths": 5,
+  "label": [
+   8,
+   6,
+   "start"
+  ]
+ },
+ "SGY": {
+  "name": "Skagway",
+  "country": "US",
+  "lon": -135.32,
+  "lat": 59.45,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "gold rush",
+   "railway"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 330,
+  "callFee": 1900,
+  "headTax": 20,
+  "berths": 4,
+  "label": [
+   6,
+   -6,
+   "start"
+  ]
+ },
+ "HNS": {
+  "name": "Haines",
+  "country": "US",
+  "lon": -135.45,
+  "lat": 59.24,
+  "appeal": [
+   6,
+   6
+  ],
+  "tags": [
+   "bald eagles"
+  ],
+  "berth": "pier",
+  "maxDraft": 9,
+  "maxLength": 280,
+  "callFee": 1200,
+  "headTax": 12,
+  "berths": 1,
+  "tenderOk": true,
+  "label": [
+   8,
+   12,
+   "start"
+  ]
+ },
+ "ISP": {
+  "name": "Icy Strait Point",
+  "country": "US",
+  "lon": -135.45,
+  "lat": 58.05,
+  "appeal": [
+   7,
+   7
+  ],
+  "tags": [
+   "bears",
+   "zip lines"
+  ],
+  "berth": "tender",
+  "callFee": 1500,
+  "headTax": 15,
+  "tenderFee": 2500,
+  "berths": 2,
+  "label": [
+   -6,
+   14,
+   "end"
+  ]
+ },
+ "GLB": {
+  "name": "Glacier Bay",
+  "country": "US",
+  "lon": -136.95,
+  "lat": 59.0,
+  "appeal": [
+   10,
+   10
+  ],
+  "tags": [
+   "glaciers",
+   "national park"
+  ],
+  "berth": "scenic",
+  "callFee": 0,
+  "headTax": 0,
+  "lockedBy": "permit",
+  "label": [
+   -8,
+   -6,
+   "end"
+  ]
+ },
+ "SIT": {
+  "name": "Sitka",
+  "country": "US",
+  "lon": -135.45,
+  "lat": 57.05,
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "Russian history",
+   "sea otters"
+  ],
+  "berth": "tender",
+  "callFee": 1600,
+  "headTax": 15,
+  "tenderFee": 2500,
+  "berths": 2,
+  "label": [
+   8,
+   12,
+   "start"
+  ]
+ },
+ "HUB": {
+  "name": "Hubbard Glacier",
+  "country": "US",
+  "lon": -139.5,
+  "lat": 59.97,
+  "appeal": [
+   9,
+   9
+  ],
+  "tags": [
+   "glaciers"
+  ],
+  "berth": "scenic",
+  "ice": true,
+  "callFee": 0,
+  "headTax": 0,
+  "label": [
+   -8,
+   4,
+   "end"
+  ]
+ },
+ "SWD": {
+  "name": "Seward",
+  "country": "US",
+  "lon": -149.44,
+  "lat": 60.1,
+  "appeal": [
+   7,
+   7
+  ],
+  "tags": [
+   "Kenai Fjords",
+   "glaciers"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 340,
+  "fuel": true,
+  "turnaround": true,
+  "callFee": 2000,
+  "headTax": 20,
+  "berths": 2,
+  "label": [
+   8,
+   -4,
+   "start"
+  ]
+ }
+}

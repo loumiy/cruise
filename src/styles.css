@@ -235,7 +235,8 @@ textarea.code { width: 100%; min-height: 5rem; font-family: var(--f-mono); font-
 .port { cursor: pointer; }
 .port .mk { stroke: var(--ink); stroke-width: 1.6; }
 .port .hit { fill: transparent; stroke: none; }
-.port .lbl { font-family: var(--f-ui); font-size: 13px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--water); stroke-width: 3.5px; stroke-linejoin: round; }
+#stormLayer, #routeLayer, #shipLayer { pointer-events: none; }
+.port .lbl { pointer-events: none; font-family: var(--f-ui); font-size: 13px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--water); stroke-width: 3.5px; stroke-linejoin: round; }
 .port.blocked .mk { fill: var(--muted); stroke: var(--muted); } .port.blocked .lbl { fill: var(--muted); }
 .port.locked { cursor: not-allowed; }
 .port:hover .mk, .port:focus .mk { stroke-width: 2.6; }
@@ -299,6 +300,7 @@ textarea.code { width: 100%; min-height: 5rem; font-family: var(--f-mono); font-
 .fleet td.num { font-family: var(--f-mono); text-align: right; }
 .tree { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; }
 .branch { display: flex; flex-direction: column; gap: .4rem; }
+.chk { display: flex; gap: .35rem; align-items: center; font-size: .84rem; }
 .island { display: flex; gap: .6rem 1rem; align-items: center; flex-wrap: wrap; }
 .tnode { border: 1.5px solid var(--rule); padding: .4rem .5rem; text-align: left; background: transparent; display: flex; flex-direction: column; gap: 2px; font-size: .8rem; min-height: 5.4rem; }
 .tnode b { font-size: .86rem; }

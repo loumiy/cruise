@@ -89,13 +89,25 @@ export function chartroom(app: App): Screen {
     h += '<div class="sub2">' + esc(t('chart.departsOn', { date: fmtDate(ship.day + plan.wait), season: season ? t('season.' + season.id) : t('season.closed') })) +
       (plan.wait ? ' · ' + esc(tn('chart.idle', plan.wait, { cost: kmoney(specs.lease * plan.wait) })) : '') + '</div>';
 
+    // Emissions control area: choose low-sulfur fuel or risk a fine, unless the ship is fitted to burn clean.
+    if (region.eca) {
+      if (specs.lng || specs.scrubber) h += '<div class="sub2 good">' + ICON.ok + ' ' + esc(t(specs.lng ? 'chart.fuel.lng' : 'chart.fuel.scrubber')) + '</div>';
+      else {
+        const low = plan.lowSulfur ?? true;
+        h += '<div data-tut="fuel"><div class="label" style="margin-bottom:4px">' + esc(t('chart.fuel.label')) + '</div><div class="seg">' +
+          '<button type="button" data-lowsulfur="1" aria-pressed="' + low + '">' + esc(t('chart.fuel.low', { price: region.eca.lowSulfurPrice })) + '</button>' +
+          '<button type="button" data-lowsulfur="0" aria-pressed="' + !low + '">' + esc(t('chart.fuel.standard', { price: region.fuelPrice })) + '</button></div></div>';
+      }
+    }
+
     // Itinerary
     const legLine = (i: number) => {
       const l = P!.legs[i];
       if (!l) return '';
       const bad = P!.issues.some(x => x.lvl === 'err' && x.at === l.to && /late|fuel/i.test(x.key));
       return '<div class="leg' + (bad ? ' bad' : '') + '">' + esc(t('chart.legLine', { nm: Math.round(l.r.nm), kn: l.speed.toFixed(1), h: l.sailH.toFixed(1) })) +
-        (l.idleH > 0.5 ? esc(t('chart.legAnchor', { h: l.idleH.toFixed(1) })) : '') +
+        (l.tideWait > 0.3 ? esc(t('chart.legTide', { h: l.tideWait.toFixed(1) })) : '') +
+        (l.idleH - l.tideWait > 0.5 ? esc(t('chart.legAnchor', { h: (l.idleH - l.tideWait).toFixed(1) })) : '') +
         (l.r.canals.length ? esc(t('chart.legVia', { canal: l.r.canals.map(c => t('canal.' + c)).join(', ') })) : '') + '</div>';
     };
     h += '<div><div class="label" style="margin-bottom:6px;display:flex;justify-content:space-between"><span>' + esc(t('chart.itinerary')) + '</span>' +
@@ -106,7 +118,7 @@ export function chartroom(app: App): Screen {
       h += legLine(i);
       const c = P!.calls[i];
       h += '<div class="stop"><span class="n">' + (i + 1) + '</span><span><span class="nm">' + esc(region.ports[id].name) + '</span><br><span class="tm">' +
-        esc(c ? t('weekday.' + c.weekday) + ' ' + fmtClock(c.arr) + ' → ' + fmtClock(c.dep) + (c.refuel ? ' · ' + t('chart.refuel') : '') +
+        esc(c ? t('weekday.' + c.weekday) + ' ' + fmtClock(c.arr) + ' → ' + fmtClock(c.dep) + (c.scenic ? ' · ' + t('chart.cruiseBy') : '') + (c.refuel ? ' · ' + t('chart.refuel') : '') +
           (c.rivals.length ? ' · ' + tn('chart.rivalsHere', c.rivals.length) : '') + (c.tender ? ' · ' + t('chart.tendering') : '') : t('chart.notReached')) + '</span></span>' +
         '<span class="ctl"><button class="btn sm" data-up="' + i + '" type="button" aria-label="' + esc(t('chart.moveUp')) + '"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
         '<button class="btn sm" data-dn="' + i + '" type="button" aria-label="' + esc(t('chart.moveDown')) + '"' + (i === plan.stops.length - 1 ? ' disabled' : '') + '>↓</button>' +
@@ -150,6 +162,7 @@ export function chartroom(app: App): Screen {
     }));
     box.querySelectorAll<HTMLButtonElement>('[data-nights]').forEach(b => b.onclick = () => change(() => { plan.nights = Number(b.dataset.nights); }));
     box.querySelectorAll<HTMLButtonElement>('[data-wait]').forEach(b => b.onclick = () => change(() => { plan.wait = Number(b.dataset.wait); }));
+    box.querySelectorAll<HTMLButtonElement>('[data-lowsulfur]').forEach(b => b.onclick = () => change(() => { plan.lowSulfur = b.dataset.lowsulfur === '1'; }));
     box.querySelectorAll<HTMLButtonElement>('[data-up]').forEach(b => b.onclick = () => change(() => { const i = Number(b.dataset.up); [plan.stops[i - 1], plan.stops[i]] = [plan.stops[i], plan.stops[i - 1]]; }));
     box.querySelectorAll<HTMLButtonElement>('[data-dn]').forEach(b => b.onclick = () => change(() => { const i = Number(b.dataset.dn); [plan.stops[i + 1], plan.stops[i]] = [plan.stops[i], plan.stops[i + 1]]; }));
     box.querySelectorAll<HTMLButtonElement>('[data-rm]').forEach(b => b.onclick = () => change(() => { plan.stops.splice(Number(b.dataset.rm), 1); }));
@@ -188,7 +201,7 @@ export function chartroom(app: App): Screen {
     sv += '<line x1="' + X(best[0]) + '" x2="' + X(best[0]) + '" y1="' + Y(best[1]) + '" y2="72" stroke="var(--ink-2)" stroke-width="1" stroke-dasharray="2 2"/>';
     sv += '<circle cx="' + X(s.plan.fare) + '" cy="' + Y(F.profit) + '" r="4.5" fill="var(--sheet)" stroke="var(--ink)" stroke-width="2"/>';
     sv += '<text x="10" y="86" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)">$' + FARE_MIN + '</text><text x="310" y="86" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)">$' + FARE_MAX + '</text>';
-    sv += '<text x="' + Math.min(290, Math.max(40, X(best[0]))) + '" y="86" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)">' + esc(t('chart.best', { fare: best[0], profit: kmoney(best[1]) })) + '</text>';
+    sv += '<text x="' + Math.min(255, Math.max(40, X(best[0]))) + '" y="86" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)">' + esc(t('chart.best', { fare: best[0], profit: kmoney(best[1]) })) + '</text>';
     sv += '<text x="308" y="' + (Y(0) - 3) + '" text-anchor="end" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-2)">' + esc(t('chart.breakEven')) + '</text>';
     $('#curve', root)!.innerHTML = sv;
     // Guest mix: mass and premium bookings against berths.
@@ -320,7 +333,7 @@ export function chartroom(app: App): Screen {
     tip.innerHTML = '<h4>' + esc(p.name) + '</h4><div class="sub2">' + esc(t('country.' + p.country)) + (p.turnaround ? ' · ' + esc(t('chart.tip.turnaround')) : '') + '</div>' +
       '<div class="tags">' + p.tags.map(x => '<span class="tag">' + esc(x) + '</span>').join('') + '</div>' +
       '<div class="row"><span>' + esc(t('chart.tip.appeal')) + '</span><span class="mono">' + p.appeal[0] + ' / ' + p.appeal[1] + '</span></div>' +
-      '<div class="row"><span>' + esc(t('chart.tip.berth')) + '</span><span class="mono">' + esc(p.berth === 'tender' ? t('chart.tip.tender') : t('chart.tip.pier', { draft: p.maxDraft ?? '—', len: p.maxLength ?? '—' })) + '</span></div>' +
+      '<div class="row"><span>' + esc(t('chart.tip.berth')) + '</span><span class="mono">' + esc(p.berth === 'pier' ? t('chart.tip.pier', { draft: p.maxDraft ?? '—', len: p.maxLength ?? '—' }) : t('chart.tip.' + p.berth)) + '</span></div>' +
       '<div class="row"><span>' + esc(t('chart.tip.fuel')) + '</span><span class="mono">' + esc(p.fuel ? t('chart.tip.fuelYes') : t('chart.tip.fuelNo')) + '</span></div>' +
       '<div class="row"><span>' + esc(t('chart.tip.fees')) + '</span><span class="mono">$' + p.callFee.toLocaleString('en-US') + ' + $' + p.headTax + '/' + esc(t('chart.tip.guest')) + '</span></div>' +
       (p.berths != null && !p.privateIsland ? '<div class="row"><span>' + esc(t('chart.tip.piers')) + '</span><span class="mono">' + p.berths + (p.tenderOk ? ' + ' + esc(t('chart.tip.anchor')) : '') + '</span></div>' + rivalWeek(id) : '') +
