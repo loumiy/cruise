@@ -59,32 +59,32 @@
     "errors": [],
     "appeal": 45,
     "fare": 165,
-    "booked": 902,
+    "booked": 898,
     "fuel": 41,
-    "profit": 268986
+    "profit": 266845
   },
   "liner · Eastern Caribbean from Barbados · 6n": {
     "errors": [],
     "appeal": 64,
     "fare": 170,
-    "booked": 902,
+    "booked": 898,
     "fuel": 110,
-    "profit": 421414
+    "profit": 417577
   },
   "mega · Western Caribbean · 7n": {
     "errors": [],
     "appeal": 59,
     "fare": 145,
     "booked": 2212,
-    "fuel": 507,
-    "profit": 361353
+    "fuel": 447,
+    "profit": 402204
   },
   "mega · Eastern Caribbean from San Juan · 7n": {
     "errors": [],
     "appeal": 77,
     "fare": 150,
     "booked": 2212,
-    "fuel": 306,
-    "profit": 499628
+    "fuel": 296,
+    "profit": 506866
   }
 }
