@@ -358,3 +358,10 @@ textarea.code { width: 100%; min-height: 5rem; font-family: var(--f-mono); font-
 :root[data-tint="tropic"] { --shoal: #b9e6e1; --water: #f3fbfb; --land: #efe2bf; }
 @media (prefers-color-scheme: dark) { :root[data-tint="tropic"]:not([data-theme="light"]) { --shoal: #12423f; --water: #0c1d22; } }
 :root[data-tint="tropic"][data-theme="dark"] { --shoal: #12423f; --water: #0c1d22; }
+/* Alaska runs deep blue-green; Europe is drawn on warm paper. */
+:root[data-tint="fjord"] { --shoal: #bcd9d6; --water: #f1f8f7; }
+@media (prefers-color-scheme: dark) { :root[data-tint="fjord"]:not([data-theme="light"]) { --shoal: #133a3c; --water: #0c1b1f; } }
+:root[data-tint="fjord"][data-theme="dark"] { --shoal: #133a3c; --water: #0c1b1f; }
+:root[data-tint="paper"] { --shoal: #d6e2e4; --water: #fbf8f1; --land: #eadcb6; --grat: #ddd6c4; }
+@media (prefers-color-scheme: dark) { :root[data-tint="paper"]:not([data-theme="light"]) { --shoal: #223238; --water: #141a1d; --land: #3d3526; } }
+:root[data-tint="paper"][data-theme="dark"] { --shoal: #223238; --water: #141a1d; --land: #3d3526; }

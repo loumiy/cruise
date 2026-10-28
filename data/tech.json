@@ -140,6 +140,24 @@
       "unlocks": [
         "LNG"
       ]
+    },
+    {
+      "id": "battery",
+      "branch": "power",
+      "tier": 3,
+      "cost": 4,
+      "unlocks": [
+        "BAT"
+      ]
+    },
+    {
+      "id": "lightweight",
+      "branch": "hull",
+      "tier": 3,
+      "cost": 4,
+      "effect": {
+        "burn": 0.85
+      }
     }
   ]
 }

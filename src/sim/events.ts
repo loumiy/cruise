@@ -36,7 +36,7 @@ export function rollEvents(plan: Plan, ship: ShipSpecs, booked: number, seed: nu
   const seasonId = plan.season?.id;
 
   for (const leg of plan.legs) {
-    for (const e of EVENTS.filter(x => x.on === 'leg')) {
+    for (const e of EVENTS.filter(x => x.on === 'leg' && (!x.region || x.region === region.id))) {
       if (e.once && fired.has(e.id)) continue;
       if (e.minNm && leg.r.nm < e.minNm) continue;
       const zone = e.zone ? region.zones[e.zone] ?? [] : [];
@@ -83,7 +83,7 @@ export function rollEvents(plan: Plan, ship: ShipSpecs, booked: number, seed: nu
   for (const c of plan.calls) {
     const p = P[c.id];
     if (closed.has(c.id)) continue;
-    for (const e of EVENTS.filter(x => x.on === 'call')) {
+    for (const e of EVENTS.filter(x => x.on === 'call' && (!x.region || x.region === region.id))) {
       if (e.port && e.port !== c.id) continue;
       if (e.season && e.season !== seasonId) continue;
       if (e.berth && e.berth !== p.berth) continue;

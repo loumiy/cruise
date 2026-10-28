@@ -80,7 +80,7 @@ describe('writing budgets', () => {
     expect(bad.map(([k]) => k)).toEqual([]);
   });
   it('every warning and error names a fix', () => {
-    const rules = entries.filter(([k]) => /^(drydock\.rule|plan|cross)\./.test(k) && !/^plan\.(tender|canal)$/.test(k) && !/^cross\.(intro|stats|ready|carry|keep|cash|rep|left|title|go|plan)$/.test(k) && k !== 'plan.port.unknown');
+    const rules = entries.filter(([k]) => /^(drydock\.rule|plan|cross)\./.test(k) && !/^plan\.(tender|canal)$/.test(k) && !/^cross\.(intro|stats|ready|carry|keep|cash|rep|left|title|go|goAtlantic|plan)$/.test(k) && k !== 'plan.port.unknown');
     const noFix = rules.filter(([, v]) => sentences(v).length !== 2);
     expect(noFix.map(([k, v]) => k + ': ' + v)).toEqual([]);
   });

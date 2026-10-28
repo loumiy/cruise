@@ -8,7 +8,7 @@ export const FARE_MAX = 600;
 export const FARE_STEP = 5;
 export const CREW_WAGE = 95;
 export const FOOD_PER_GUEST = 38;
-export const NIGHTS_DEMAND: Record<number, number> = { 3: 1.15, 4: 1, 5: 0.92, 6: 0.85, 7: 0.8 };
+export const NIGHTS_DEMAND: Record<number, number> = { 3: 1.15, 4: 1, 5: 0.92, 6: 0.85, 7: 0.8, 8: 0.78, 9: 0.76, 10: 0.74, 11: 0.72, 12: 0.7, 13: 0.69, 14: 0.68 };
 
 /** What the economy needs from a plan. A real Plan fits; so does the Drydock's typical cruise. */
 export interface PlanSummary {
@@ -19,13 +19,19 @@ export interface PlanSummary {
   crowd?: number;
   /** Price per tonne, when emissions rules change it from the region's usual price. */
   fuelPrice?: number;
+  /** Carbon charge per tonne of fuel burned, offsets included. */
+  carbonPrice?: number;
+  /** Bookings multiplier from fly-in guests. */
+  flyIn?: number;
+  /** Offsets bought: premium guests like a carbon-neutral cruise. */
+  offset?: boolean;
 }
 
 export interface Market { rep: number; demandBonus: number }
 
 export interface Finance {
   mass: number; premium: number; booked: number; bookedMass: number; bookedPremium: number; occ: number;
-  rev: number; onboard: number; crew: number; lease: number; food: number; fuel: number; ports: number;
+  rev: number; onboard: number; crew: number; lease: number; food: number; fuel: number; carbon: number; ports: number;
   fees: number; cost: number; profit: number;
 }
 
@@ -49,6 +55,7 @@ export function summarise(plan: Plan, idleDays = 0): PlanSummary {
     }),
     crowd: plan.calls.reduce((a, c) => Math.max(a, c.crowd), 0),
     fuelPrice: fuelPriceFor(plan.input.region, plan.fuelMode),
+    carbonPrice: plan.carbonPrice, flyIn: plan.flyIn, offset: plan.offset,
   };
 }
 
@@ -59,16 +66,17 @@ export const MASS_UNDERCUT_CAP = 1.8;
 /** Premium guests avoid big ships: demand halves by about 1,800 berths. */
 export const sizeAversion = (pax: number) => 1 / (1 + Math.max(0, pax - 600) / 1200);
 
-export function demand(region: Region, ship: Pick<ShipSpecs, 'luxury' | 'pax'>, p: Pick<PlanSummary, 'score' | 'nights' | 'seasonDemand' | 'crowd'>, fare: number, mk: Market) {
+export function demand(region: Region, ship: Pick<ShipSpecs, 'luxury' | 'pax'>, p: Pick<PlanSummary, 'score' | 'nights' | 'seasonDemand' | 'crowd' | 'flyIn' | 'offset'>, fare: number, mk: Market) {
   const m = region.market;
   const appealF = Math.pow(Math.max(p.score, 1) / 60, 1.4);
   const repF = Math.max(0.6, 1 + 0.1 * (mk.rep - 3)) * (1 + mk.demandBonus);
-  const k = appealF * repF * p.seasonDemand * (NIGHTS_DEMAND[p.nights] ?? 0.8);
+  const k = appealF * repF * p.seasonDemand * (NIGHTS_DEMAND[p.nights] ?? 0.8) * (p.flyIn ?? 1);
   const lux = Math.min(1.6, ship.luxury);
   const eff = fare / (1 + 0.35 * lux);
   const mass = m.mass * k * Math.min(MASS_UNDERCUT_CAP, Math.exp(-(eff - m.rivalFare) / m.massSens));
   const crowdF = 1 - Math.min(0.6, (p.crowd ?? 0) / 10000);
-  const premium = m.premium * k * crowdF * sizeAversion(ship.pax) * (0.6 + 0.5 * Math.min(1, lux)) * Math.min(2.5, Math.exp(-(eff - m.rivalFare) / m.premiumSens));
+  const green = p.offset ? region.carbon?.offsetDemand ?? 1 : 1;
+  const premium = m.premium * k * green * crowdF * sizeAversion(ship.pax) * (0.6 + 0.5 * Math.min(1, lux)) * Math.min(2.5, Math.exp(-(eff - m.rivalFare) / m.premiumSens));
   return { mass, premium };
 }
 
@@ -84,12 +92,13 @@ export function finance(region: Region, ship: ShipSpecs, p: PlanSummary, fare: n
   const lease = ship.lease * (n + p.idleDays);
   const food = booked * n * FOOD_PER_GUEST;
   const fuel = Math.round(p.burned * (p.fuelPrice ?? region.fuelPrice));
+  const carbon = Math.round(p.burned * (p.carbonPrice ?? 0));
   const ports = p.calls.reduce((s, c) => s + c.callFee + c.headTax * booked + c.tenderFee, 0);
   const fees = p.tolls + p.pilotage;
-  const cost = crew + lease + food + fuel + ports + fees;
+  const cost = crew + lease + food + fuel + carbon + ports + fees;
   return {
     mass, premium, booked, bookedMass, bookedPremium, occ: ship.pax ? booked / ship.pax : 0,
-    rev, onboard, crew, lease, food, fuel, ports, fees, cost, profit: rev + onboard - cost,
+    rev, onboard, crew, lease, food, fuel, carbon, ports, fees, cost, profit: rev + onboard - cost,
   };
 }
 
@@ -105,12 +114,14 @@ export function bestFare(region: Region, ship: ShipSpecs, p: PlanSummary, mk: Ma
   return { fare, profit };
 }
 
-/** The Drydock's "typical cruise": 4 nights, 3 calls, 900 nm, appeal 60, best fare. */
+/** The Drydock's "typical cruise": 4 nights (or the region's shortest), 3 calls, 225 nm a night, appeal 60, best fare. */
 export function typicalCruise(region: Region, ship: ShipSpecs, mk: Market = { rep: 3, demandBonus: 0 }) {
-  const nights = 4, nmTotal = 900, speed = Math.min(ship.vmax, 12);
+  // Regions with longer cruises use their shortest one, with the same miles per night.
+  const nights = region.nights?.[0] ?? 4, nmTotal = 225 * nights, speed = Math.min(ship.vmax, 12);
   const burned = nmTotal * ship.burnPerNm * Math.pow(speed / ship.vmax, 2) + ship.hotelTph * nights * 24;
   const p: PlanSummary = {
     nights, score: 60, burned, tolls: 0, pilotage: 0, seasonDemand: 1, idleDays: 0,
+    carbonPrice: region.carbon ? region.carbon.price * (ship.lng ? region.carbon.lngShare : 1) : 0,
     calls: [0, 1, 2].map(() => ({ callFee: 1800, headTax: 18, tenderFee: 0 })),
   };
   const best = bestFare(region, ship, p, mk);

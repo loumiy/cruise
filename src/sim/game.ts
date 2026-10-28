@@ -4,7 +4,7 @@ import { BLOCKS, FIRST_DP, HULLS, MILESTONES, REGIONS, TECH, type Region } from 
 import starters from '../../data/starters.json';
 import { analyse, designHash, refitCost, type Design, type DesignReport, type Placed, type ShipSpecs } from './ship';
 import { seaTrial, type TrialResult, type TrialKind } from './trial';
-import { planVoyage, turnarounds, type Plan } from './planner';
+import { planVoyage, turnarounds, nightOptions, type Plan } from './planner';
 import { fairFare, finance, summarise, type Finance, type Market } from './economy';
 import { planSeed, rollEvents, type VoyageEvent } from './events';
 import { canBuy, dpSpent, techMods, blockUnlocked, type TechMods } from './tech';
@@ -27,7 +27,7 @@ export const FULL_OCC = 0.95;
 /** Glacier Bay permits: weekly slots per season, and the range rivals bid in. */
 export const MAX_PERMITS = 2;
 export const PERMIT_BID_RANGE: [number, number] = [150000, 350000];
-const WILDLIFE = ['whales', 'calving', 'bears', 'eagles', 'iceberg'];
+const WILDLIFE = ['whales', 'calving', 'bears', 'eagles', 'iceberg', 'dolphins'];
 
 export interface Blueprint {
   id: string; name: string; design: Design;
@@ -45,11 +45,15 @@ export interface LogEntry {
   fine?: boolean;
   /** Wildlife sightings logged on the cruise. */
   wild?: number;
+  /** Canals transited, chart areas touched, and whether carbon offsets were bought. */
+  canals?: string[]; areas?: string[]; offset?: boolean;
 }
 export interface PlanDraft {
   shipId: string; nights: number; wait: number; stops: string[]; end: string; fare: number;
   /** In an emissions control area: buy low-sulfur fuel (default) or risk a fine. */
   lowSulfur?: boolean;
+  /** Where carbon is charged: buy offsets for a carbon-neutral cruise. */
+  offset?: boolean;
 }
 /** A season's Glacier Bay permit result: weekly slots won, and whether a bid already went in. */
 export interface PermitRecord { slots: number; bid: number; rival: number; outbid?: boolean }
@@ -61,7 +65,7 @@ export interface GameState {
   region: string;
   cash: number; rep: number;
   dpEarned: number; tech: string[]; firsts: string[]; milestones: string[];
-  unlocked: { drydock: boolean; hulls: string[]; portGroups: string[] };
+  unlocked: { drydock: boolean; hulls: string[]; portGroups: string[]; fleet?: boolean };
   demandBonus: number;
   blueprints: Blueprint[]; ships: ShipRec[]; log: LogEntry[]; voyages: number;
   plan: PlanDraft;
@@ -82,7 +86,7 @@ export function placedFrom(raw: StarterBlock[], prefix = 'b'): Placed[] {
   });
 }
 
-type StarterKey = 'puffin' | 'harbor' | 'crown' | 'majesty' | 'tern';
+type StarterKey = 'puffin' | 'harbor' | 'crown' | 'majesty' | 'tern' | 'sovereign';
 const STARTERS = starters as unknown as Record<StarterKey, { name: string; hull: string; blocks: StarterBlock[] }>;
 
 function starter(key: StarterKey): Design {
@@ -91,7 +95,7 @@ function starter(key: StarterKey): Design {
 }
 
 /** A hull unlock comes with a template design to start from. */
-const HULL_TEMPLATE: Record<string, StarterKey> = { liner: 'crown', mega: 'majesty', expedition: 'tern' };
+const HULL_TEMPLATE: Record<string, StarterKey> = { liner: 'crown', mega: 'majesty', expedition: 'tern', grand: 'sovereign' };
 
 function addTemplate(s: GameState, hull: string): void {
   const key = HULL_TEMPLATE[hull];
@@ -272,7 +276,7 @@ export function draftPlan(s: GameState, draft: PlanDraft = s.plan): Plan | null 
   const plan = planVoyage({
     region: regionOf(s), ship: specsOf(s, ship), start: ship.port, stops: draft.stops, end: draft.end,
     nights: draft.nights, departDay, openGroups: openGroups(s, departDay), sandbox: isSandbox(s), tech: mods(s),
-    lowSulfur: draft.lowSulfur ?? true,
+    lowSulfur: draft.lowSulfur ?? true, offset: !!draft.offset,
   });
   // Permits are weekly: each slot covers one Glacier Bay call per week across the fleet.
   const permitPorts = Object.keys(plan.input.region.ports).filter(id => plan.input.region.ports[id].lockedBy === 'permit');
@@ -349,12 +353,17 @@ export function normalisePlan(s: GameState): void {
   const region = regionOf(s);
   if (!region.ports[p.end]?.turnaround) p.end = region.ports[ship.port]?.turnaround ? ship.port : turnarounds(region)[0];
   p.wait = Math.max(0, Math.min(MAX_WAIT, p.wait));
+  // Each region offers its own cruise lengths: snap to the closest one on offer.
+  const opts = nightOptions(region);
+  if (!opts.includes(p.nights)) p.nights = opts.reduce((a, n) => Math.abs(n - p.nights) < Math.abs(a - p.nights) ? n : a, opts[0]);
 }
 
 export interface VoyageResult {
   plan: Plan; fin: Finance; events: VoyageEvent[]; sat: number; profit: number; extra: number;
   repBefore: number; repAfter: number; cashBefore: number; cashAfter: number;
   milestones: string[]; firsts: string[]; dp: number; shipId: string; logN: number;
+  /** This cruise was the Grand Tour: the campaign is complete. */
+  grandTour?: boolean;
 }
 
 /** Satisfaction comes from appeal, the ship's venues, fare against a fair price, and events. */
@@ -377,6 +386,7 @@ export function sail(s: GameState): VoyageResult | null {
   const extra = events.reduce((a, e) => a + e.cost, 0);
   const profit = Math.round(fin.profit - extra);
   const repBefore = s.rep, cashBefore = s.cash;
+  const tour = grandTourOpen(s) && grandTourChecks(s, plan).every(c => c.ok);
 
   if (!isSandbox(s)) s.cash += profit;
   s.voyages += 1;
@@ -394,6 +404,7 @@ export function sail(s: GameState): VoyageResult | null {
     booked: fin.booked, pax: plan.input.ship.pax, fare, profit, sat,
     events: events.map(e => ({ key: e.key, vars: e.vars, good: e.good })),
     fine: events.some(e => e.id === 'ecaFine'), wild: events.filter(e => WILDLIFE.includes(e.id)).length,
+    ...(region.carbon || region.areas ? { canals: plan.canals, areas: plan.areas, offset: plan.offset } : {}),
   });
   if (s.log.length > 60) s.log.shift();
 
@@ -412,15 +423,24 @@ export function sail(s: GameState): VoyageResult | null {
   if (plan.calls.some(c => c.refuel)) earnFirst(s, 'refuel', firsts);
   if (profit >= 100000) earnFirst(s, 'sixfig', firsts);
   if (plan.season?.id === 'hurricane' && profit > 0) earnFirst(s, 'hurricane', firsts);
+  if (plan.zeroCalls.some(id => !cancelled.has(id))) earnFirst(s, 'zero', firsts);
+  if (plan.offset) earnFirst(s, 'neutral', firsts);
+  if (plan.input.nights >= 14) earnFirst(s, 'fortnight', firsts);
+  if (tour) {
+    earnFirst(s, 'grandTour', firsts);
+    s.milestones.push(region.graduation!.id);
+    s.unlocked.fleet = true;
+  }
 
   const milestones = checkMilestones(s, {
     profit, visited: [...visited, plan.input.end], booked: fin.booked, pax: plan.input.ship.pax,
-    season: plan.season?.id ?? '', day: plan.input.departDay,
+    season: plan.season?.id ?? '', day: plan.input.departDay, canals: plan.canals, offset: plan.offset,
   });
   normalisePlan(s);
   return {
     plan, fin, events, sat, profit, extra, repBefore, repAfter: s.rep, cashBefore, cashAfter: s.cash,
     milestones, firsts, dp: firsts.reduce((a, f) => a + firstDp(f), 0), shipId: ship.id, logN: s.voyages,
+    ...(tour ? { grandTour: true } : {}),
   };
 }
 
@@ -435,7 +455,7 @@ function earnFirst(s: GameState, id: string, into: string[]): void {
   into.push(id);
 }
 
-export interface VoyageFacts { profit: number; visited: string[]; booked?: number; pax?: number; season?: string; day?: number }
+export interface VoyageFacts { profit: number; visited: string[]; booked?: number; pax?: number; season?: string; day?: number; canals?: string[]; offset?: boolean }
 
 /** Guests carried by full-booked cruises departing in the 7 days up to `day`, in this region. */
 export function weekGuests(s: GameState, day: number): number {
@@ -455,6 +475,11 @@ export function cleanSeason(s: GameState, n: number): boolean {
     years.set(y, rec);
   }
   return [...years.values()].some(r => r.cruises >= n && r.fines === 0);
+}
+
+/** Profitable summer cruises in this region that stayed inside the given chart areas. */
+export function areaSummer(s: GameState, areas: string[]): number {
+  return s.log.filter(v => v.region === s.region && v.season === 'summer' && v.profit > 0 && !!v.areas?.length && v.areas.every(a => areas.includes(a))).length;
 }
 
 export function checkMilestones(s: GameState, v: VoyageFacts = { profit: -Infinity, visited: [] }): string[] {
@@ -478,7 +503,10 @@ export function checkMilestones(s: GameState, v: VoyageFacts = { profit: -Infini
         && (T.visitAny == null || T.visitAny.some(p => v.visited.includes(p)))
         && (T.permit == null || Object.entries(s.permits ?? {}).some(([k, r]) => k.startsWith(s.region + ':') && r.slots > 0))
         && (T.wildlife == null || (s.log.length > 0 && s.log[s.log.length - 1].region === s.region && (s.log[s.log.length - 1].wild ?? 0) >= T.wildlife && v.day != null))
-        && (T.cleanSeason == null || cleanSeason(s, T.cleanSeason));
+        && (T.cleanSeason == null || cleanSeason(s, T.cleanSeason))
+        && (T.canal == null || !!v.canals?.includes(T.canal))
+        && (T.offset == null || (!!v.offset && v.profit > 0))
+        && (T.areaSummer == null || areaSummer(s, T.areaSummer.areas) >= T.areaSummer.n);
       if (!ok) continue;
       s.milestones.push(m.id);
       gained.push(m.id);
@@ -505,8 +533,32 @@ export function currentGoal(s: GameState): string | null {
 
 export function graduationOpen(s: GameState): boolean {
   const g = regionOf(s).graduation;
-  if (!g || g.locked || !g.toRegion) return false;
+  if (!g || g.locked || !g.toRegion || g.cruise) return false;
   return isSandbox(s) || !g.requires || s.milestones.includes(g.requires);
+}
+
+// ---------- The Grand Tour: the cruise that ends the campaign ----------
+
+/** The final region's graduation is a cruise, not a crossing. It opens once the chapter goals are met. */
+export function grandTourOpen(s: GameState): boolean {
+  const g = regionOf(s).graduation;
+  if (!g?.cruise || s.milestones.includes(g.id)) return false;
+  return isSandbox(s) || !g.requires || s.milestones.includes(g.requires);
+}
+
+export interface TourCheck { key: string; ok: boolean; vars?: Vars }
+
+/** What the Grand Tour asks of a cruise, item by item, so the planner can show a checklist. */
+export function grandTourChecks(s: GameState, plan: Plan): TourCheck[] {
+  const c = regionOf(s).graduation?.cruise;
+  if (!c) return [];
+  return [
+    { key: 'tour.nights', ok: plan.input.nights >= c.nights, vars: { n: c.nights } },
+    { key: 'tour.areas', ok: plan.areas.length >= c.areas, vars: { n: c.areas, have: plan.areas.length } },
+    ...(c.zeroEmission ? [{ key: 'tour.zero', ok: plan.zeroCalls.length > 0 }] : []),
+    { key: 'tour.rep', ok: s.rep >= c.rep, vars: { stars: c.rep.toFixed(1), have: s.rep.toFixed(1) } },
+    { key: 'tour.clear', ok: plan.errors === 0 },
+  ];
 }
 
 export function crossingFor(s: GameState, ship: ShipRec): CrossingCheck {
@@ -547,9 +599,11 @@ export function graduate(s: GameState, shipIds: string[]): GraduationResult | Ch
   s.rep = Math.round((s.rep + START_REP) / 2 * 10) / 10;
   s.region = g.toRegion!;
   earnFirst(s, 'crossing', res.firsts);
+  if (g.guestLeg) earnFirst(s, 'transatlantic', res.firsts);
   if (g.unlockHull && !s.unlocked.hulls.includes(g.unlockHull)) { s.unlocked.hulls.push(g.unlockHull); addTemplate(s, g.unlockHull); }
   for (const sh of going) if (!seasonOf(REGIONS[g.toRegion!], sh.day)) sh.day = nextOpenDay(REGIONS[g.toRegion!], sh.day);
   s.plan = { shipId: going[0].id, nights: 7, wait: 0, stops: [], end: g.toPort!, fare: 180, lowSulfur: true };
+  normalisePlan(s);
   res.cashAfter = s.cash;
   res.repAfter = s.rep;
   return res;

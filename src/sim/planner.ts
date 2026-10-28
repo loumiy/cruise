@@ -14,6 +14,8 @@ export const MIN_STAY = 8;
 export const MIN_SPEED = 10;
 export const FUEL_RESERVE = 0.15;
 export const NIGHT_OPTIONS = [3, 4, 5, 6, 7];
+/** Cruise lengths a region offers. Europe runs longer cruises with fly-in guests. */
+export const nightOptions = (region: Region) => region.nights ?? NIGHT_OPTIONS;
 /** Scenic stops: cruise past in daylight for a few hours. */
 export const SCENIC_STAY = 4;
 export const DAYLIGHT = [6, 16];
@@ -45,6 +47,8 @@ export interface PlanInput {
   tech?: TechMods;
   /** In an emissions control area, without a scrubber or LNG: pay for low-sulfur fuel, or risk a fine. */
   lowSulfur?: boolean;
+  /** Where carbon is charged: also buy offsets for the rest, for a carbon-neutral cruise. */
+  offset?: boolean;
 }
 
 export type PlanLevel = 'err' | 'warn' | 'info';
@@ -89,17 +93,31 @@ export interface Plan {
   seaDays: number; nm: number;
   /** How the ship meets emissions rules, when the region has them. */
   fuelMode: FuelMode | null;
+  /** Carbon charged per tonne of fuel burned, offsets included; 0 where there is no carbon charge. */
+  carbonPrice: number;
+  /** Offsets bought: the cruise counts as carbon-neutral. */
+  offset: boolean;
+  /** Bookings multiplier from the turnarounds' airports. */
+  flyIn: number;
+  /** Chart areas the cruise touches, start and end included. */
+  areas: string[];
+  /** Calls made in zero-emission waters. */
+  zeroCalls: string[];
   score: number; parts: { key: string; vars?: Vars; v: number }[]; tags: string[];
   issues: PlanIssue[]; broken: boolean; errors: number; warnings: number;
 }
 
 export type PortCheck = { ok: true } | { ok: false; key: string; vars?: Vars; locked?: boolean };
 
-export function portStatus(region: Region, id: string, ship: Pick<ShipSpecs, 'draft' | 'length'> & { beam?: number }, openGroups: string[], sandbox = false): PortCheck {
+export function portStatus(region: Region, id: string, ship: Pick<ShipSpecs, 'draft' | 'length'> & { beam?: number; air?: number; zeroNm?: number }, openGroups: string[], sandbox = false): PortCheck {
   const p = region.ports[id];
   if (!p) return { ok: false, key: 'plan.port.unknown' };
   if (p.closed) return { ok: false, key: 'plan.port.closed', vars: { port: p.name } };
   if (p.lockedBy && !sandbox && !openGroups.includes(p.lockedBy)) return { ok: false, key: 'plan.port.locked.' + p.lockedBy, vars: { port: p.name }, locked: true };
+  // A ban (Venice's lagoon) bars big ships outright, whatever the pier could take.
+  if (p.ban && ((p.maxLength != null && ship.length > p.maxLength) || (p.maxAir != null && ship.air != null && ship.air > p.maxAir))) {
+    return { ok: false, key: 'plan.port.banned', vars: { port: p.name, len: p.maxLength ?? '—', air: p.maxAir ?? '—' } };
+  }
   if (p.berth === 'pier' && p.maxDraft != null && ship.draft > p.maxDraft) {
     return { ok: false, key: 'plan.port.tooDeep', vars: { port: p.name, max: p.maxDraft, draft: ship.draft } };
   }
@@ -108,6 +126,12 @@ export function portStatus(region: Region, id: string, ship: Pick<ShipSpecs, 'dr
   }
   if (p.maxBeam != null && ship.beam != null && ship.beam > p.maxBeam) {
     return { ok: false, key: 'plan.port.tooWide', vars: { port: p.name, max: p.maxBeam, beam: ship.beam } };
+  }
+  if (p.maxAir != null && ship.air != null && ship.air > p.maxAir) {
+    return { ok: false, key: 'plan.port.tooTall', vars: { port: p.name, max: p.maxAir, air: ship.air } };
+  }
+  if (p.zeroNm != null && ship.zeroNm != null && ship.zeroNm < p.zeroNm) {
+    return { ok: false, key: 'plan.port.zeroEmission', vars: { port: p.name, need: p.zeroNm, have: Math.floor(ship.zeroNm) } };
   }
   return { ok: true };
 }
@@ -136,7 +160,7 @@ export function planVoyage(input: PlanInput): Plan {
   const fuelPts: [number, number][] = [[t, fuel]];
   const deadline = nights * 24 + ARRIVE_BY;
   const canals: string[] = [], scenic: string[] = [];
-  const size = { draft: ship.draft, air: ship.air, beam: ship.beam };
+  const size = { draft: ship.draft, air: ship.air, beam: ship.beam, length: ship.length };
   // Air conditioning in hot regions raises the hotel load.
   const hotel = ship.hotelTph * (region.hotelMult ?? 1);
 
@@ -156,6 +180,9 @@ export function planVoyage(input: PlanInput): Plan {
       }
     }
     if (!r) { E('plan.noRoute', { from: P[a].name, to: P[b].name }, b); broken = true; break; }
+    // Too big for a canal on the shortest way: say so, since the long way round costs time and fuel.
+    const any = route(region, a, b, { draft: 0, air: 0, beam: 0, length: 0 });
+    for (const c of any?.canals ?? []) if (!r.canals.includes(c)) I('plan.canalAround', { canal: '@canal.' + c, nm: Math.round(r.nm - any!.nm) }, b);
     tolls += r.tolls; pilotage += r.pilotage; nm += r.nm;
     r.canals.forEach(c => { if (!canals.includes(c)) canals.push(c); });
     r.scenic.forEach(c => { if (!scenic.includes(c)) scenic.push(c); });
@@ -251,6 +278,24 @@ export function planVoyage(input: PlanInput): Plan {
     if (fuelMode === 'standard') W('plan.ecaRisk', { fine: '$' + Math.round(region.eca.fine / 1000) + 'k' });
   }
   canals.forEach(c => I('plan.canal', { canal: '@canal.' + c }));
+  // Carbon: charged on every tonne burned. LNG emits less; offsets buy the rest back.
+  let carbonPrice = 0;
+  const offset = !!region.carbon && !!input.offset;
+  if (region.carbon) {
+    const share = ship.lng ? region.carbon.lngShare : 1;
+    carbonPrice = region.carbon.price * share + (offset ? region.carbon.offset * share : 0);
+  }
+  // Fly-in guests: turnarounds near a big airport book better.
+  let flyIn = 1;
+  if (region.flyIn) {
+    const air = ((P[start].airport ?? 0) + (P[end].airport ?? 0)) / 2;
+    flyIn = 1 + region.flyIn * (air - 0.5) * 2;
+    if (input.stops.length) I('plan.flyIn', { pct: (flyIn >= 1 ? '+' : '−') + Math.round(Math.abs(flyIn - 1) * 100) + '%' });
+  }
+  const areas: string[] = [];
+  for (const id of [start, ...calls.map(c => c.id), end]) { const ar = P[id].area; if (ar && !areas.includes(ar)) areas.push(ar); }
+  const zeroCalls = calls.filter(c => P[c.id].zeroNm != null).map(c => c.id);
+  zeroCalls.forEach(id => I('plan.zeroCall', { port: P[id].name, nm: P[id].zeroNm! }, id));
 
   // Appeal: each new port adds its appeal, each theme adds 2.5, on a curve.
   let raw = 0;
@@ -270,6 +315,11 @@ export function planVoyage(input: PlanInput): Plan {
     p.tags.forEach(x => tags.add(x));
   }
   if (tags.size) { const tb = tags.size * 2.5; raw += tb; parts.push({ key: 'appeal.variety', vars: { n: tags.size }, v: tb }); }
+  if (region.countryBonus) {
+    const countries = new Set(calls.map(c => P[c.id].country));
+    const cb = Math.max(0, countries.size - 1) * region.countryBonus;
+    if (cb) { raw += cb; parts.push({ key: 'appeal.countries', vars: { n: countries.size }, v: cb }); }
+  }
   if (scenic.length) {
     const sb = region.scenicBonus + ship.scenic;
     raw += sb; parts.push({ key: 'appeal.scenic', vars: { name: '@scenic.' + scenic[0] }, v: sb });
@@ -281,7 +331,7 @@ export function planVoyage(input: PlanInput): Plan {
   const errors = issues.filter(i => i.lvl === 'err').length;
   return {
     input, season, legs, calls, ret, deadline, fuelPts, minFuel, minFuelAt, burned,
-    tolls, pilotage, canals, scenic, seaDays, nm, fuelMode, score, parts, tags: [...tags],
+    tolls, pilotage, canals, scenic, seaDays, nm, fuelMode, carbonPrice, offset, flyIn, areas, zeroCalls, score, parts, tags: [...tags],
     issues, broken, errors, warnings: issues.filter(i => i.lvl === 'warn').length,
   };
 }

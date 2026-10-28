@@ -26,6 +26,8 @@ export interface ShipSpecs {
   scrubber: boolean; lng: boolean;
   /** Guests the zodiacs can land in a day. */
   zodiacSeats: number;
+  /** Miles the batteries can run at 10 kn with no emissions, hotel load included. */
+  zeroNm: number;
 }
 
 export interface DesignReport {
@@ -46,6 +48,10 @@ export const HOTEL_T_PER_KWH = 0.00011;
 export const BASE_SPEND = 55;
 /** Guests one venue serves before a second one is needed. */
 export const VENUE_SERVES = 300;
+/** Each battery block stores the energy of this many tonnes of fuel. */
+export const BATTERY_T = 2;
+/** Zero-emission running is done at harbour speed. */
+export const ZERO_SPEED = 10;
 
 const N4: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
@@ -140,7 +146,7 @@ export function analyse(design: Design, tech: TechMods = NO_TECH): DesignReport 
 
   let pax = 0, viewSum = 0, beds = 0, staff = 0, seats = 0, supply = hull.baseSupplyKw, demand = 0;
   let lifeboatSeats = 0, tanks = 0, provisions = 0, fsMoment = 0, scenic = 0, fitOut = 0;
-  let scrubber = false, lng = false, zodiacSeats = 0;
+  let scrubber = false, lng = false, zodiacSeats = 0, battery = 0;
   let W = hull.lightship.weight, Mz = W * hull.lightship.kg, My = 0;
   const ice = !!hull.ice || !!design.options?.ice;
   if (design.options?.ice && !hull.ice) {
@@ -164,6 +170,7 @@ export function analyse(design: Design, tech: TechMods = NO_TECH): DesignReport 
     if (t.scrubber) scrubber = true;
     if (t.lng) lng = true;
     zodiacSeats += t.zodiac ?? 0;
+    battery += t.battery ?? 0;
     fitOut += t.cost;
     if (t.sat) venueCount[b.type] = (venueCount[b.type] ?? 0) + 1;
   }
@@ -248,13 +255,16 @@ export function analyse(design: Design, tech: TechMods = NO_TECH): DesignReport 
   const foodDays = souls ? provisions / souls : 0;
   const endurance = Math.min(fuelDays, foodDays);
   const luxury = pax ? viewSum / pax : 0;
+  // Battery range: stored energy over what a mile costs at harbour speed, propulsion plus hotel.
+  const perNm = hull.burnPerNm * tech.burn * Math.pow(Math.min(1, ZERO_SPEED / hull.vmax), 2) + hotelTph / ZERO_SPEED;
+  const zeroNm = battery ? battery * BATTERY_T / perNm : 0;
 
   const errors = issues.filter(i => i.lvl === 'err').length;
   const specs: ShipSpecs = {
     hull: design.hull, pax, crew: crewNeed, draft: hull.draft, air: hull.airDraft, length: hull.length, beam: hull.beam,
     vmax: hull.vmax, burnPerNm: hull.burnPerNm * tech.burn, fuelCap, hotelTph, foodDays,
     gm, listDeg: listDeg ?? 0, rollK: hull.rollK * tech.roll, galeK: hull.galeK * tech.gale,
-    shipSat: sat, spend, luxury, scenic, lease: hull.leasePerNight, souls, fitOut, ice, scrubber, lng, zodiacSeats,
+    shipSat: sat, spend, luxury, scenic, lease: hull.leasePerNight, souls, fitOut, ice, scrubber, lng, zodiacSeats, zeroNm,
   };
   return {
     issues, flags, errors, warnings: issues.length - errors,

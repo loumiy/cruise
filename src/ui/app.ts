@@ -162,6 +162,19 @@ export class App {
     this.modal({ title: t('chapter.title', { n: to.chapter, region: t('region.' + to.id) }), body, buttons: [{ label: t('chapter.start'), primary: true }] });
   }
 
+  /** The end of the campaign: the Grand Tour is done. Fleet mode is the next thing to open. */
+  campaignEnd() {
+    const s = this.state;
+    const body = '<p class="hint" style="font-size:.95rem">' + esc(t('campaign.intro')) + '</p>' +
+      '<div class="ledger"><span>' + esc(t('campaign.voyages')) + '</span><span class="mono">' + s.voyages + '</span>' +
+      '<span>' + esc(t('campaign.firsts')) + '</span><span class="mono">' + s.firsts.length + ' · ' + s.dpEarned + ' DP</span>' +
+      '<span>' + esc(t('campaign.fleet')) + '</span><span class="mono">' + esc(s.ships.map(x => x.name).join(', ')) + '</span>' +
+      (s.mode === 'sandbox' ? '' : '<span>' + esc(t('ui.cash')) + '</span><span class="mono">' + money(s.cash) + '</span>') +
+      '<span>' + esc(t('ui.reputation')) + '</span><span class="mono">' + s.rep.toFixed(1) + '</span></div>' +
+      '<div class="unlock"><b>' + esc(t('campaign.fleetMode')) + '</b> ' + esc(t('campaign.fleetModeSub')) + '</div>';
+    this.modal({ title: t('campaign.title'), body, buttons: [{ label: t('campaign.keepSailing'), primary: true }] });
+  }
+
   // ---------- menu: saves and settings ----------
 
   openMenu() {

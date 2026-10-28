@@ -150,6 +150,63 @@
     "rep": 4
    },
    "reward": {
+    "demand": 0.1,
+    "unlockHull": "grand"
+   }
+  }
+ ],
+ "europe": [
+  {
+   "id": "firstFjord",
+   "test": {
+    "visitAny": [
+     "GEI",
+     "FLA"
+    ]
+   },
+   "reward": {
+    "cash": 200000
+   }
+  },
+  {
+   "id": "kielShortcut",
+   "test": {
+    "canal": "kiel"
+   },
+   "reward": {
+    "cash": 150000
+   }
+  },
+  {
+   "id": "medSummer",
+   "test": {
+    "areaSummer": {
+     "areas": [
+      "wmed",
+      "emed"
+     ],
+     "n": 3
+    }
+   },
+   "reward": {
+    "demand": 0.05
+   }
+  },
+  {
+   "id": "carbonNeutral",
+   "test": {
+    "offset": true
+   },
+   "reward": {
+    "cash": 150000
+   }
+  },
+  {
+   "id": "euroFavorite",
+   "test": {
+    "rep": 4.5
+   },
+   "reward": {
     "demand": 0.1
    }
   }

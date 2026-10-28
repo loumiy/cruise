@@ -499,12 +499,19 @@ export function drydock(app: App): Screen {
       max: fuelRange(a.specs, a.specs.vmax, region.hotelMult ?? 1).days.toFixed(1), top: a.specs.vmax,
       ac: (region.hotelMult ?? 1) > 1 ? t('drydock.ro.withAc') : '',
     }), 0.4);
+    // Zero-emission waters: show the battery range wherever a port needs it, or once batteries are fitted.
+    const zeroNeed = Math.max(0, ...Object.values(region.ports).map(p => p.zeroNm ?? 0));
+    if (zeroNeed || a.specs.zeroNm) {
+      const zs = !zeroNeed || a.specs.zeroNm >= zeroNeed ? 'ok' : a.specs.zeroNm > 0 ? 'warn' : 'err';
+      h += gauge(t('drydock.ro.battery'), Math.floor(a.specs.zeroNm) + ' nm', a.specs.zeroNm / Math.max(60, zeroNeed * 1.5), zs,
+        zeroNeed ? t('drydock.ro.batterySub', { need: zeroNeed }) : t('drydock.ro.batteryNone'), zeroNeed ? zeroNeed / Math.max(60, zeroNeed * 1.5) : undefined);
+    }
     h += gauge(t('drydock.ro.sat'), String(Math.round(a.sat)), a.sat / 100, a.sat >= 60 ? 'ok' : a.sat >= 40 ? 'warn' : 'err', t('drydock.ro.satSub', { spend: Math.round(a.spend) }));
     h += '<hr class="r"><div><div class="label" style="margin-bottom:4px">' + esc(t('drydock.ro.typical', { fare: tc.fare })) + '</div><div class="ledger">' +
       '<span>' + esc(t('drydock.ro.guests', { n: tc.fin.booked, pax: a.pax })) + '</span><span class="mono">' + money(tc.fin.rev + tc.fin.onboard) + '</span>' +
       '<span>' + esc(t('ledger.crew')) + '</span><span class="mono">' + money(-tc.fin.crew) + '</span>' +
       '<span>' + esc(t('ledger.lease')) + '</span><span class="mono">' + money(-tc.fin.lease) + '</span>' +
-      '<span>' + esc(t('ledger.foodFuelPorts')) + '</span><span class="mono">' + money(-(tc.fin.food + tc.fin.fuel + tc.fin.ports)) + '</span>' +
+      '<span>' + esc(t('ledger.foodFuelPorts')) + '</span><span class="mono">' + money(-(tc.fin.food + tc.fin.fuel + tc.fin.carbon + tc.fin.ports)) + '</span>' +
       '<span class="tot">' + esc(t('ledger.profit')) + '</span><span class="mono tot" style="color:' + (tc.fin.profit >= 0 ? 'var(--ok)' : 'var(--err)') + '">' + money(tc.fin.profit) + '</span></div></div>';
     h += '<hr class="r"><div><div class="label" style="margin-bottom:6px">' + esc(t('drydock.inspection', { e: a.errors, w: a.warnings })) + '</div><div class="issues scroll" id="issues"></div></div>';
     const box = $('#readouts', root)!;

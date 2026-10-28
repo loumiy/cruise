@@ -1083,6 +1083,30 @@
  },
  "graduation": {
   "id": "transatlantic",
-  "locked": true
+  "toRegion": "europe",
+  "toPort": "SOU",
+  "from": [
+   "SEA",
+   "YVR"
+  ],
+  "nm": {
+   "SEA": 9400,
+   "YVR": 9500
+  },
+  "legNm": 2500,
+  "speed": 16,
+  "swell": 2.2,
+  "requires": "northernLight",
+  "grant": 1200000,
+  "keepCash": 0.25,
+  "limits": {
+   "maxAir": 61.3,
+   "maxBeam": 51.25,
+   "maxLength": 366
+  },
+  "guestLeg": {
+   "nm": 3000,
+   "days": 8
+  }
  }
 }

@@ -1,0 +1,949 @@
+{
+ "SOU": {
+  "name": "Southampton",
+  "country": "GB",
+  "lon": -1.39,
+  "lat": 50.87,
+  "area": "british",
+  "appeal": [
+   6,
+   6
+  ],
+  "tags": [
+   "London",
+   "history"
+  ],
+  "berth": "pier",
+  "turnaround": true,
+  "airport": 1.0,
+  "fuel": true,
+  "berths": 5,
+  "maxDraft": 12,
+  "maxLength": 370,
+  "callFee": 3200,
+  "headTax": 28,
+  "label": [
+   8,
+   14,
+   "start"
+  ]
+ },
+ "DUB": {
+  "name": "Dublin",
+  "country": "IE",
+  "lon": -6.18,
+  "lat": 53.35,
+  "area": "british",
+  "appeal": [
+   7,
+   6
+  ],
+  "tags": [
+   "pubs",
+   "history"
+  ],
+  "berth": "pier",
+  "berths": 2,
+  "tenderOk": true,
+  "maxDraft": 10,
+  "maxLength": 330,
+  "callFee": 2600,
+  "headTax": 20,
+  "label": [
+   -8,
+   4,
+   "end"
+  ]
+ },
+ "COB": {
+  "name": "Cobh (Cork)",
+  "country": "IE",
+  "lon": -8.3,
+  "lat": 51.81,
+  "area": "british",
+  "appeal": [
+   6,
+   5
+  ],
+  "tags": [
+   "countryside",
+   "Titanic"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 350,
+  "callFee": 2200,
+  "headTax": 18,
+  "label": [
+   8,
+   12,
+   "start"
+  ]
+ },
+ "EDI": {
+  "name": "Edinburgh",
+  "country": "GB",
+  "lon": -3.25,
+  "lat": 56.02,
+  "area": "british",
+  "appeal": [
+   8,
+   7
+  ],
+  "tags": [
+   "castle",
+   "festival"
+  ],
+  "berth": "tender",
+  "callFee": 2400,
+  "headTax": 20,
+  "label": [
+   -8,
+   -6,
+   "end"
+  ]
+ },
+ "KOI": {
+  "name": "Kirkwall",
+  "country": "GB",
+  "lon": -2.88,
+  "lat": 59.06,
+  "area": "british",
+  "appeal": [
+   6,
+   5
+  ],
+  "tags": [
+   "Neolithic",
+   "islands"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 300,
+  "callFee": 1800,
+  "headTax": 15,
+  "label": [
+   8,
+   -4,
+   "start"
+  ]
+ },
+ "BGO": {
+  "name": "Bergen",
+  "country": "NO",
+  "lon": 5.3,
+  "lat": 60.39,
+  "area": "nordic",
+  "appeal": [
+   8,
+   6
+  ],
+  "tags": [
+   "fjords",
+   "Hanseatic"
+  ],
+  "berth": "pier",
+  "fuel": true,
+  "maxDraft": 11,
+  "maxLength": 350,
+  "berths": 4,
+  "callFee": 2600,
+  "headTax": 22,
+  "label": [
+   8,
+   12,
+   "start"
+  ]
+ },
+ "GEI": {
+  "name": "Geiranger",
+  "country": "NO",
+  "lon": 7.2,
+  "lat": 62.1,
+  "area": "nordic",
+  "appeal": [
+   10,
+   6
+  ],
+  "tags": [
+   "fjords",
+   "waterfalls"
+  ],
+  "berth": "tender",
+  "zeroNm": 40,
+  "callFee": 2000,
+  "headTax": 25,
+  "label": [
+   8,
+   4,
+   "start"
+  ]
+ },
+ "FLA": {
+  "name": "Flåm",
+  "country": "NO",
+  "lon": 7.11,
+  "lat": 60.86,
+  "area": "nordic",
+  "appeal": [
+   9,
+   6
+  ],
+  "tags": [
+   "fjords",
+   "railway"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 300,
+  "zeroNm": 50,
+  "callFee": 2000,
+  "headTax": 25,
+  "label": [
+   8,
+   12,
+   "start"
+  ]
+ },
+ "SVG": {
+  "name": "Stavanger",
+  "country": "NO",
+  "lon": 5.73,
+  "lat": 58.97,
+  "area": "nordic",
+  "appeal": [
+   7,
+   5
+  ],
+  "tags": [
+   "fjords",
+   "Lysefjord"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 350,
+  "callFee": 2200,
+  "headTax": 20,
+  "label": [
+   8,
+   4,
+   "start"
+  ]
+ },
+ "OSL": {
+  "name": "Oslo",
+  "country": "NO",
+  "lon": 10.74,
+  "lat": 59.86,
+  "area": "nordic",
+  "appeal": [
+   7,
+   6
+  ],
+  "tags": [
+   "city",
+   "museums"
+  ],
+  "berth": "pier",
+  "fuel": true,
+  "maxDraft": 11,
+  "maxLength": 340,
+  "callFee": 2600,
+  "headTax": 22,
+  "label": [
+   8,
+   -4,
+   "start"
+  ]
+ },
+ "CPH": {
+  "name": "Copenhagen",
+  "country": "DK",
+  "lon": 12.61,
+  "lat": 55.7,
+  "area": "nordic",
+  "appeal": [
+   8,
+   7
+  ],
+  "tags": [
+   "design",
+   "city"
+  ],
+  "berth": "pier",
+  "turnaround": true,
+  "airport": 1.0,
+  "fuel": true,
+  "berths": 5,
+  "maxDraft": 11,
+  "maxLength": 370,
+  "callFee": 3000,
+  "headTax": 26,
+  "label": [
+   8,
+   -6,
+   "start"
+  ]
+ },
+ "KEL": {
+  "name": "Kiel",
+  "country": "DE",
+  "lon": 10.15,
+  "lat": 54.32,
+  "area": "nordic",
+  "appeal": [
+   5,
+   5
+  ],
+  "tags": [
+   "sailing"
+  ],
+  "berth": "pier",
+  "turnaround": true,
+  "airport": 0.5,
+  "fuel": true,
+  "maxDraft": 10,
+  "maxLength": 350,
+  "callFee": 2400,
+  "headTax": 18,
+  "label": [
+   -8,
+   10,
+   "end"
+  ]
+ },
+ "STO": {
+  "name": "Stockholm",
+  "country": "SE",
+  "lon": 18.62,
+  "lat": 59.33,
+  "area": "nordic",
+  "appeal": [
+   8,
+   7
+  ],
+  "tags": [
+   "archipelago",
+   "city"
+  ],
+  "berth": "pier",
+  "turnaround": true,
+  "airport": 0.9,
+  "fuel": true,
+  "maxDraft": 10,
+  "maxLength": 340,
+  "callFee": 2800,
+  "headTax": 24,
+  "label": [
+   -8,
+   -6,
+   "end"
+  ]
+ },
+ "TLL": {
+  "name": "Tallinn",
+  "country": "EE",
+  "lon": 24.75,
+  "lat": 59.45,
+  "area": "nordic",
+  "appeal": [
+   8,
+   6
+  ],
+  "tags": [
+   "medieval",
+   "city"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 350,
+  "berths": 3,
+  "callFee": 2200,
+  "headTax": 16,
+  "label": [
+   0,
+   16,
+   "middle"
+  ]
+ },
+ "HEL": {
+  "name": "Helsinki",
+  "country": "FI",
+  "lon": 24.95,
+  "lat": 60.15,
+  "area": "nordic",
+  "appeal": [
+   7,
+   6
+  ],
+  "tags": [
+   "design",
+   "saunas"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 350,
+  "callFee": 2400,
+  "headTax": 18,
+  "label": [
+   8,
+   -6,
+   "start"
+  ]
+ },
+ "LIS": {
+  "name": "Lisbon",
+  "country": "PT",
+  "lon": -9.13,
+  "lat": 38.7,
+  "area": "wmed",
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "history",
+   "fado"
+  ],
+  "berth": "pier",
+  "turnaround": true,
+  "airport": 0.9,
+  "fuel": true,
+  "maxDraft": 12,
+  "maxLength": 370,
+  "callFee": 2800,
+  "headTax": 22,
+  "label": [
+   8,
+   -4,
+   "start"
+  ]
+ },
+ "GIB": {
+  "name": "Gibraltar",
+  "country": "GI",
+  "lon": -5.36,
+  "lat": 36.13,
+  "area": "wmed",
+  "appeal": [
+   6,
+   6
+  ],
+  "tags": [
+   "the Rock",
+   "apes"
+  ],
+  "berth": "pier",
+  "fuel": true,
+  "maxDraft": 12,
+  "maxLength": 360,
+  "callFee": 1800,
+  "headTax": 14,
+  "label": [
+   -8,
+   14,
+   "end"
+  ]
+ },
+ "AGP": {
+  "name": "Málaga",
+  "country": "ES",
+  "lon": -4.42,
+  "lat": 36.71,
+  "area": "wmed",
+  "appeal": [
+   7,
+   7
+  ],
+  "tags": [
+   "beaches",
+   "Picasso"
+  ],
+  "berth": "pier",
+  "maxDraft": 12,
+  "maxLength": 360,
+  "callFee": 2400,
+  "headTax": 18,
+  "label": [
+   0,
+   -10,
+   "middle"
+  ]
+ },
+ "BCN": {
+  "name": "Barcelona",
+  "country": "ES",
+  "lon": 2.17,
+  "lat": 41.37,
+  "area": "wmed",
+  "appeal": [
+   9,
+   8
+  ],
+  "tags": [
+   "Gaudí",
+   "city"
+  ],
+  "berth": "pier",
+  "turnaround": true,
+  "airport": 1.0,
+  "fuel": true,
+  "berths": 6,
+  "maxDraft": 12,
+  "maxLength": 370,
+  "callFee": 3400,
+  "headTax": 30,
+  "label": [
+   -8,
+   12,
+   "end"
+  ]
+ },
+ "PMI": {
+  "name": "Palma",
+  "country": "ES",
+  "lon": 2.63,
+  "lat": 39.54,
+  "area": "wmed",
+  "appeal": [
+   7,
+   7
+  ],
+  "tags": [
+   "beaches",
+   "cathedral"
+  ],
+  "berth": "pier",
+  "maxDraft": 12,
+  "maxLength": 360,
+  "berths": 4,
+  "callFee": 2600,
+  "headTax": 22,
+  "label": [
+   -8,
+   14,
+   "end"
+  ]
+ },
+ "MRS": {
+  "name": "Marseille",
+  "country": "FR",
+  "lon": 5.36,
+  "lat": 43.3,
+  "area": "wmed",
+  "appeal": [
+   7,
+   7
+  ],
+  "tags": [
+   "Provence",
+   "food"
+  ],
+  "berth": "pier",
+  "turnaround": true,
+  "airport": 0.8,
+  "fuel": true,
+  "maxDraft": 12,
+  "maxLength": 370,
+  "callFee": 3000,
+  "headTax": 24,
+  "label": [
+   -8,
+   14,
+   "end"
+  ]
+ },
+ "VFR": {
+  "name": "Villefranche",
+  "country": "FR",
+  "lon": 7.31,
+  "lat": 43.7,
+  "area": "wmed",
+  "appeal": [
+   9,
+   8
+  ],
+  "tags": [
+   "Riviera",
+   "Monaco"
+  ],
+  "berth": "tender",
+  "callFee": 2600,
+  "headTax": 26,
+  "label": [
+   2,
+   -10,
+   "middle"
+  ]
+ },
+ "LIV": {
+  "name": "Livorno",
+  "country": "IT",
+  "lon": 10.3,
+  "lat": 43.55,
+  "area": "wmed",
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "Florence",
+   "Pisa"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 350,
+  "berths": 4,
+  "callFee": 2600,
+  "headTax": 22,
+  "label": [
+   8,
+   4,
+   "start"
+  ]
+ },
+ "CIV": {
+  "name": "Civitavecchia",
+  "country": "IT",
+  "lon": 11.79,
+  "lat": 42.09,
+  "area": "wmed",
+  "appeal": [
+   9,
+   9
+  ],
+  "tags": [
+   "Rome",
+   "history"
+  ],
+  "berth": "pier",
+  "turnaround": true,
+  "airport": 1.0,
+  "fuel": true,
+  "berths": 6,
+  "maxDraft": 12,
+  "maxLength": 370,
+  "callFee": 3200,
+  "headTax": 28,
+  "label": [
+   8,
+   -4,
+   "start"
+  ]
+ },
+ "NAP": {
+  "name": "Naples",
+  "country": "IT",
+  "lon": 14.26,
+  "lat": 40.84,
+  "area": "wmed",
+  "appeal": [
+   9,
+   8
+  ],
+  "tags": [
+   "Pompeii",
+   "pizza"
+  ],
+  "berth": "pier",
+  "maxDraft": 12,
+  "maxLength": 360,
+  "berths": 4,
+  "callFee": 2800,
+  "headTax": 24,
+  "label": [
+   8,
+   -4,
+   "start"
+  ]
+ },
+ "VLT": {
+  "name": "Valletta",
+  "country": "MT",
+  "lon": 14.52,
+  "lat": 35.9,
+  "area": "wmed",
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "fortress",
+   "history"
+  ],
+  "berth": "pier",
+  "fuel": true,
+  "maxDraft": 11,
+  "maxLength": 350,
+  "callFee": 2200,
+  "headTax": 18,
+  "label": [
+   8,
+   4,
+   "start"
+  ]
+ },
+ "VCE": {
+  "name": "Venice",
+  "country": "IT",
+  "lon": 12.36,
+  "lat": 45.42,
+  "area": "emed",
+  "appeal": [
+   10,
+   9
+  ],
+  "tags": [
+   "canals",
+   "art"
+  ],
+  "berth": "pier",
+  "turnaround": true,
+  "airport": 0.9,
+  "ban": true,
+  "maxLength": 180,
+  "maxAir": 35,
+  "maxDraft": 8,
+  "callFee": 3600,
+  "headTax": 32,
+  "label": [
+   -8,
+   -4,
+   "end"
+  ]
+ },
+ "TRS": {
+  "name": "Trieste",
+  "country": "IT",
+  "lon": 13.76,
+  "lat": 45.64,
+  "area": "emed",
+  "appeal": [
+   6,
+   6
+  ],
+  "tags": [
+   "coffee",
+   "Habsburg"
+  ],
+  "berth": "pier",
+  "turnaround": true,
+  "airport": 0.6,
+  "fuel": true,
+  "maxDraft": 12,
+  "maxLength": 370,
+  "callFee": 2400,
+  "headTax": 18,
+  "label": [
+   8,
+   -4,
+   "start"
+  ]
+ },
+ "DBV": {
+  "name": "Dubrovnik",
+  "country": "HR",
+  "lon": 18.09,
+  "lat": 42.65,
+  "area": "emed",
+  "appeal": [
+   9,
+   8
+  ],
+  "tags": [
+   "walled city",
+   "film sets"
+  ],
+  "berth": "pier",
+  "berths": 2,
+  "tenderOk": true,
+  "maxDraft": 11,
+  "maxLength": 340,
+  "callFee": 2600,
+  "headTax": 26,
+  "label": [
+   8,
+   4,
+   "start"
+  ]
+ },
+ "CFU": {
+  "name": "Corfu",
+  "country": "GR",
+  "lon": 19.92,
+  "lat": 39.62,
+  "area": "emed",
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "beaches",
+   "Venetian"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 350,
+  "callFee": 2200,
+  "headTax": 18,
+  "label": [
+   -8,
+   4,
+   "end"
+  ]
+ },
+ "PIR": {
+  "name": "Piraeus",
+  "country": "GR",
+  "lon": 23.63,
+  "lat": 37.94,
+  "area": "emed",
+  "appeal": [
+   9,
+   9
+  ],
+  "tags": [
+   "Acropolis",
+   "history"
+  ],
+  "berth": "pier",
+  "turnaround": true,
+  "airport": 1.0,
+  "fuel": true,
+  "berths": 5,
+  "maxDraft": 12,
+  "maxLength": 370,
+  "callFee": 3000,
+  "headTax": 24,
+  "label": [
+   -8,
+   -6,
+   "end"
+  ]
+ },
+ "JMK": {
+  "name": "Mykonos",
+  "country": "GR",
+  "lon": 25.31,
+  "lat": 37.45,
+  "area": "emed",
+  "appeal": [
+   8,
+   7
+  ],
+  "tags": [
+   "beaches",
+   "nightlife"
+  ],
+  "berth": "tender",
+  "callFee": 2000,
+  "headTax": 20,
+  "label": [
+   0,
+   -11,
+   "middle"
+  ]
+ },
+ "JTR": {
+  "name": "Santorini",
+  "country": "GR",
+  "lon": 25.36,
+  "lat": 36.42,
+  "area": "emed",
+  "appeal": [
+   10,
+   9
+  ],
+  "tags": [
+   "caldera",
+   "sunsets"
+  ],
+  "berth": "tender",
+  "berths": 3,
+  "callFee": 2400,
+  "headTax": 30,
+  "label": [
+   -8,
+   4,
+   "end"
+  ]
+ },
+ "RHO": {
+  "name": "Rhodes",
+  "country": "GR",
+  "lon": 28.23,
+  "lat": 36.45,
+  "area": "emed",
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "knights",
+   "beaches"
+  ],
+  "berth": "pier",
+  "maxDraft": 10,
+  "maxLength": 340,
+  "callFee": 2200,
+  "headTax": 18,
+  "label": [
+   -8,
+   -6,
+   "end"
+  ]
+ },
+ "KUS": {
+  "name": "Kuşadası",
+  "country": "TR",
+  "lon": 27.24,
+  "lat": 37.86,
+  "area": "emed",
+  "appeal": [
+   8,
+   8
+  ],
+  "tags": [
+   "Ephesus",
+   "bazaar"
+  ],
+  "berth": "pier",
+  "maxDraft": 11,
+  "maxLength": 350,
+  "callFee": 2000,
+  "headTax": 15,
+  "label": [
+   8,
+   -6,
+   "start"
+  ]
+ },
+ "IST": {
+  "name": "Istanbul",
+  "country": "TR",
+  "lon": 28.98,
+  "lat": 41.01,
+  "area": "emed",
+  "appeal": [
+   10,
+   9
+  ],
+  "tags": [
+   "mosques",
+   "bazaar"
+  ],
+  "berth": "pier",
+  "turnaround": true,
+  "airport": 1.0,
+  "fuel": true,
+  "maxDraft": 12,
+  "maxLength": 370,
+  "callFee": 3000,
+  "headTax": 22,
+  "label": [
+   -4,
+   -8,
+   "end"
+  ]
+ }
+}

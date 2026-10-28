@@ -79,5 +79,59 @@
     "tag": "bald eagles",
     "odds": 0.6,
     "sat": 2
+  },
+  {
+    "id": "mistral",
+    "on": "leg",
+    "zone": "mistral",
+    "odds": 0.25,
+    "sat": -4,
+    "once": true,
+    "region": "europe"
+  },
+  {
+    "id": "meltemi",
+    "on": "leg",
+    "zone": "meltemi",
+    "odds": 0.3,
+    "sat": -3,
+    "once": true,
+    "region": "europe"
+  },
+  {
+    "id": "dolphins",
+    "on": "leg",
+    "zone": "dolphin",
+    "odds": 0.35,
+    "sat": 3,
+    "once": true,
+    "region": "europe"
+  },
+  {
+    "id": "midnightSun",
+    "on": "call",
+    "tag": "fjords",
+    "season": "summer",
+    "odds": 0.4,
+    "sat": 3,
+    "region": "europe"
+  },
+  {
+    "id": "waterfalls",
+    "on": "call",
+    "tag": "waterfalls",
+    "odds": 0.6,
+    "sat": 3,
+    "region": "europe"
+  },
+  {
+    "id": "strike",
+    "on": "call",
+    "tag": "city",
+    "odds": 0.04,
+    "sat": -5,
+    "refund": 40,
+    "cancelsCall": true,
+    "region": "europe"
   }
 ]

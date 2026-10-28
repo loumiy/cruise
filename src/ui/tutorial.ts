@@ -1,6 +1,6 @@
 // The guided first cruise. One sentence and one action per step. Skippable at any step.
 import { t } from '../sim/strings';
-import { draftPlan, planFinance, report, trialStatus, graduationOpen, regionOf, canLeaseIsland } from '../sim/game';
+import { draftPlan, planFinance, report, trialStatus, graduationOpen, regionOf, canLeaseIsland, grandTourOpen, shipById, specsOf } from '../sim/game';
 import { $$, esc } from './dom';
 import type { App, ScreenId } from './app';
 
@@ -70,7 +70,19 @@ export const HINTS: Hint[] = [
   { id: 'tide', screen: 'chartroom', when: a => planHas(a, 'plan.tideWait') || planHas(a, 'plan.outsideRoute') },
   { id: 'zodiac', screen: 'chartroom', when: a => planHas(a, 'plan.noZodiacs') },
   { id: 'ice', screen: 'chartroom', when: a => planHas(a, 'plan.noIce') },
+  { id: 'carbon', screen: 'chartroom', target: '[data-tut="carbon"]', when: a => !!regionOf(a.state).carbon && !!document.querySelector('[data-tut="carbon"]') },
+  { id: 'zero', screen: 'chartroom', target: '[data-tut="nav-drydock"]', when: a => zeroShort(a) },
+  { id: 'canalAround', screen: 'chartroom', when: a => planHas(a, 'plan.canalAround') },
+  { id: 'flyIn', screen: 'chartroom', when: a => planHas(a, 'plan.flyIn') },
+  { id: 'tour', screen: 'chartroom', target: '[data-tut="tour"]', when: a => grandTourOpen(a.state) && !!document.querySelector('[data-tut="tour"]') },
 ];
+
+/** The selected ship can't run far enough on batteries for the region's zero-emission fjords. */
+function zeroShort(a: App): boolean {
+  const r = regionOf(a.state), ship = shipById(a.state, a.state.plan.shipId);
+  const need = Math.max(0, ...Object.values(r.ports).map(p => p.zeroNm ?? 0));
+  return !!need && !!ship && specsOf(a.state, ship).zeroNm < need;
+}
 
 export class Tutorial {
   private app: App;

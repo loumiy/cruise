@@ -4,7 +4,7 @@ import { nmBetween, type LonLat } from './geo';
 
 export interface Edge extends EdgeOpts { a: string; b: string; pts: LonLat[]; len: number }
 export interface Graph { edges: Edge[]; adj: Record<string, { to: string; e: Edge }[]> }
-export interface ShipSize { draft: number; air: number; beam: number }
+export interface ShipSize { draft: number; air: number; beam: number; length?: number }
 export interface TideGate { narrows: string; atNm: number; period: number; window: number; phase: number }
 export interface Route {
   ids: string[]; pts: LonLat[]; nm: number; tolls: number; pilotage: number;
@@ -40,11 +40,12 @@ export function graphOf(region: Region): Graph {
   return g;
 }
 
-export type EdgeBlock = null | 'draft' | 'air' | 'beam';
+export type EdgeBlock = null | 'draft' | 'air' | 'beam' | 'length';
 export function edgeBlock(e: Edge, s: ShipSize): EdgeBlock {
   if (e.maxDraft && s.draft > e.maxDraft) return 'draft';
   if (e.maxAir && s.air > e.maxAir) return 'air';
   if (e.maxBeam && s.beam > e.maxBeam) return 'beam';
+  if (e.maxLength && s.length && s.length > e.maxLength) return 'length';
   return null;
 }
 

@@ -15,6 +15,10 @@
   "glacier": {
    "name": "Glacier Line",
    "style": "big ships, short trips"
+  },
+  "meridian": {
+   "name": "Meridian Cruises",
+   "style": "long Mediterranean loops"
   }
  },
  "caribbean": [
@@ -165,6 +169,106 @@
     "1": "SGY",
     "3": "KTN",
     "4": "JNU"
+   }
+  }
+ ],
+ "europe": [
+  {
+   "ship": "Azure Odyssey",
+   "line": "azure",
+   "guests": 5200,
+   "calls": {
+    "0": "NAP",
+    "1": "BCN",
+    "2": "PMI",
+    "3": "MRS",
+    "4": "VFR",
+    "5": "LIV",
+    "6": "CIV"
+   }
+  },
+  {
+   "ship": "Azure Sirocco",
+   "line": "azure",
+   "guests": 4800,
+   "calls": {
+    "0": "CIV",
+    "1": "NAP",
+    "3": "JTR",
+    "4": "JMK",
+    "5": "PIR",
+    "6": "DBV"
+   }
+  },
+  {
+   "ship": "Azure Atlantic",
+   "line": "azure",
+   "guests": 4600,
+   "calls": {
+    "6": "SOU",
+    "1": "DUB",
+    "3": "EDI",
+    "5": "BGO"
+   }
+  },
+  {
+   "ship": "Coral Aurelia",
+   "line": "coral",
+   "guests": 2400,
+   "calls": {
+    "0": "TRS",
+    "1": "DBV",
+    "2": "CFU",
+    "4": "JTR",
+    "5": "PIR"
+   }
+  },
+  {
+   "ship": "Coral Serenade",
+   "line": "coral",
+   "guests": 2200,
+   "calls": {
+    "2": "DBV",
+    "3": "KUS",
+    "4": "JTR",
+    "5": "RHO",
+    "6": "PIR"
+   }
+  },
+  {
+   "ship": "Meridian Bella",
+   "line": "meridian",
+   "guests": 3800,
+   "calls": {
+    "0": "BCN",
+    "1": "VFR",
+    "2": "LIV",
+    "3": "CIV",
+    "4": "NAP",
+    "6": "PMI"
+   }
+  },
+  {
+   "ship": "Meridian Fjord",
+   "line": "meridian",
+   "guests": 2800,
+   "calls": {
+    "0": "CPH",
+    "2": "BGO",
+    "3": "SVG",
+    "5": "OSL"
+   }
+  },
+  {
+   "ship": "Glacier Nordic",
+   "line": "glacier",
+   "guests": 4200,
+   "calls": {
+    "1": "TLL",
+    "2": "HEL",
+    "3": "STO",
+    "5": "CPH",
+    "6": "KEL"
    }
   }
  ]

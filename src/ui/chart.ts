@@ -14,11 +14,13 @@ export function chartSvg(region: Region): string {
   const { width: MW, height: MH, proj } = projector(region);
   const b = region.bounds;
   let s = '';
-  for (let lo = Math.ceil(b.lon0 / 2) * 2; lo <= b.lon1; lo += 2) {
+  // Big charts get a wider grid, so the lines don't crowd the coast.
+  const grid = b.lat1 - b.lat0 > 20 ? 2 : 1;
+  for (let lo = Math.ceil(b.lon0 / 2) * 2; lo <= b.lon1; lo += 2 * grid) {
     const [x] = proj(lo, b.lat0);
-    s += '<line x1="' + x + '" y1="0" x2="' + x + '" y2="' + MH + '" stroke="var(--grat)" stroke-width="1"/><text x="' + (x + 3) + '" y="' + (MH - 6) + '" class="sound" style="font-style:normal">' + Math.abs(lo) + '°W</text>';
+    s += '<line x1="' + x + '" y1="0" x2="' + x + '" y2="' + MH + '" stroke="var(--grat)" stroke-width="1"/><text x="' + (x + 3) + '" y="' + (MH - 6) + '" class="sound" style="font-style:normal">' + Math.abs(lo) + '°' + (lo < 0 ? 'W' : lo > 0 ? 'E' : '') + '</text>';
   }
-  for (let la = Math.ceil(b.lat0) + 1; la < b.lat1; la += 1) {
+  for (let la = Math.ceil((b.lat0 + 0.5) / grid) * grid; la < b.lat1; la += grid) {
     const [, y] = proj(b.lon0, la);
     s += '<line x1="0" y1="' + y + '" x2="' + MW + '" y2="' + y + '" stroke="var(--grat)" stroke-width="1"/><text x="' + (MW - 30) + '" y="' + (y - 3) + '" class="sound" style="font-style:normal">' + la + '°N</text>';
   }
@@ -73,7 +75,9 @@ export function chartSvg(region: Region): string {
   const ppn = pxPerNm(region), step = ppn >= 0.8 ? 50 : 100, w = step * ppn;
   s += '<g transform="translate(' + sx + ' ' + sy + ')" font-family="IBM Plex Mono, monospace" font-size="10" fill="var(--ink-2)"><rect x="0" y="0" width="' + w + '" height="5" fill="var(--ink-2)"/><rect x="' + w + '" y="0" width="' + w + '" height="5" fill="var(--sheet)" stroke="var(--ink-2)"/><text x="0" y="17">0</text><text x="' + w + '" y="17" text-anchor="middle">' + step + '</text><text x="' + 2 * w + '" y="17" text-anchor="middle">' + 2 * step + ' nm</text></g>';
   s += '<g id="stormLayer"></g><g id="routeLayer"></g><g id="portLayer"></g><g id="shipLayer"></g>';
-  return '<svg id="map" viewBox="0 0 ' + MW.toFixed(0) + ' ' + MH.toFixed(0) + '" role="img" aria-label="' + esc(t('chart.aria', { region: region.name })) + '">' + s + '</svg>';
+  // A tall chart (Europe) would run off the screen: cap its height, and its width to match.
+  const cap = MH > MW * 0.8 ? ' style="max-width:calc(82vh * ' + (MW / MH).toFixed(3) + ');margin:0 auto"' : '';
+  return '<svg id="map"' + cap + ' viewBox="0 0 ' + MW.toFixed(0) + ' ' + MH.toFixed(0) + '" role="img" aria-label="' + esc(t('chart.aria', { region: region.name })) + '">' + s + '</svg>';
 }
 
 export const pxPerNm = (region: Region) => region.bounds.scale / 60;

@@ -15,5 +15,10 @@
  "sixfig": 2,
  "crossing": 3,
  "hurricane": 3,
- "island": 2
+ "island": 2,
+ "transatlantic": 5,
+ "zero": 3,
+ "neutral": 2,
+ "fortnight": 2,
+ "grandTour": 5
 }

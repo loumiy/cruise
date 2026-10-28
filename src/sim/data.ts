@@ -14,6 +14,9 @@ import caLanes from '../../data/lanes/caribbean.json';
 import akRegion from '../../data/regions/alaska.json';
 import akPorts from '../../data/ports/alaska.json';
 import akLanes from '../../data/lanes/alaska.json';
+import euRegion from '../../data/regions/europe.json';
+import euPorts from '../../data/ports/europe.json';
+import euLanes from '../../data/lanes/europe.json';
 import rivalsJson from '../../data/rivals.json';
 
 export type Role = 'bottom' | 'lower' | 'middle' | 'upper' | 'top' | 'boat' | 'any';
@@ -26,6 +29,8 @@ export interface BlockType {
   noisy?: boolean; freeSurface?: number; supply?: number; tank?: number; provisions?: number;
   souls?: number; beds?: number; outer?: 'any' | 'all'; scenic?: number; hi?: boolean;
   scrubber?: number; lng?: number; zodiac?: number;
+  /** Battery bank: miles of zero-emission running, scaled by the hull's power use. */
+  battery?: number;
   fixed?: boolean; tech?: string;
 }
 
@@ -59,11 +64,21 @@ export interface Port {
   canalCall?: number;
   /** Ice at the glacier face: only ice-belted ships get close. */
   ice?: boolean;
+  /** Bridges or bans: the tallest ship allowed in. */
+  maxAir?: number;
+  /** The size limits are a ban on big ships, not the size of the pier. */
+  ban?: boolean;
+  /** Zero-emission waters: miles the ship must run on batteries to make the call and leave. */
+  zeroNm?: number;
+  /** Europe: which of the chart's four areas the port is in. */
+  area?: string;
+  /** Turnaround near a big airport, 0 to 1: fly-in guests book more readily. */
+  airport?: number;
   label: [number, number, string];
 }
 
 export interface EdgeOpts {
-  canal?: string; maxDraft?: number; maxAir?: number; maxBeam?: number; toll?: number;
+  canal?: string; maxDraft?: number; maxAir?: number; maxBeam?: number; maxLength?: number; toll?: number;
   via?: [number, number][]; scenic?: string; pilotage?: number;
   /** Passable only near slack water: hours between slacks, window width in hours, phase offset in hours. */
   tide?: { period: number; window: number; phase: number };
@@ -80,6 +95,10 @@ export interface Graduation {
   /** Size limits on the way, e.g. canal locks and bridges. */
   limits?: { maxAir?: number; maxBeam?: number; maxLength?: number };
   unlockHull?: string;
+  /** Part of the passage sails with guests aboard: it has to fit this many days. */
+  guestLeg?: { nm: number; days: number };
+  /** A qualifying cruise instead of a crossing: the campaign's final test. */
+  cruise?: { nights: number; areas: number; zeroEmission: boolean; rep: number };
 }
 
 export interface Rival { ship: string; line: string; guests: number; calls: Record<string, string> }
@@ -94,6 +113,16 @@ export interface Region {
   hotelMult?: number;
   /** Emissions control area: burn low-sulfur fuel, fit a scrubber or LNG, or risk a fine. */
   eca?: { lowSulfurPrice: number; lngPrice: number; fine: number; fineOdds: number };
+  /** Carbon charged per tonne of fuel burned; LNG emits a share of that. Offsets buy the rest back. */
+  carbon?: { price: number; lngShare: number; offset: number; offsetDemand: number };
+  /** Cruise lengths on offer, when not the usual 3–7 nights. */
+  nights?: number[];
+  /** Appeal for each country visited after the first. */
+  countryBonus?: number;
+  /** Fly-in guests: bookings swing this much with how close the turnarounds are to a big airport. */
+  flyIn?: number;
+  /** Chart areas, for itineraries that span several. */
+  areas?: string[];
   soundings?: { shallow: [number, number]; deep: [number, number]; deepBox?: [number, number, number, number] };
   graduation?: Graduation;
   stormNames?: string[];
@@ -119,6 +148,8 @@ export interface EventDef {
   id: string; on: 'leg' | 'call'; zone?: string; odds: number | string; fallOdds?: number;
   sat: number; once?: boolean; minNm?: number; scaleByHull?: boolean; berth?: string; refund?: number;
   cancelsCall?: boolean; port?: string; season?: string; tag?: string; minAppeal?: number; revenue?: number;
+  /** Only rolls in this region. */
+  region?: string;
 }
 
 export interface MilestoneDef {
@@ -127,6 +158,7 @@ export interface MilestoneDef {
     voyages?: number; visit?: string; profit?: number; cash?: number; rep?: number;
     regionVoyages?: number; soldOutPax?: number; island?: boolean; stormProfits?: number; weekGuests?: number;
     visitAny?: string[]; permit?: boolean; wildlife?: number; cleanSeason?: number;
+    canal?: string; offset?: boolean; areaSummer?: { areas: string[]; n: number };
   };
   reward: { cash?: number; unlock?: string; unlockPorts?: string; unlockHull?: string; demand?: number };
 }
@@ -156,7 +188,8 @@ export const REGIONS: Record<string, Region> = {
   northeast: region(neRegion, nePorts, neLanes),
   caribbean: region(caRegion, caPorts, caLanes),
   alaska: region(akRegion, akPorts, akLanes),
+  europe: region(euRegion, euPorts, euLanes),
 };
 
-export const REGION_ORDER = ['northeast', 'caribbean', 'alaska'];
-export const HULL_ORDER = ['coastal', 'liner', 'mega'];
+export const REGION_ORDER = ['northeast', 'caribbean', 'alaska', 'europe'];
+export const HULL_ORDER = ['coastal', 'expedition', 'liner', 'grand', 'mega'];
